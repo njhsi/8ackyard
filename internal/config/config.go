@@ -23,8 +23,6 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/njhsi/8ackyard/internal/event"
-	"github.com/njhsi/8ackyard/internal/hub"
-	"github.com/njhsi/8ackyard/internal/hub/places"
 	"github.com/njhsi/8ackyard/internal/mutex"
 	"github.com/njhsi/8ackyard/pkg/fs"
 	"github.com/njhsi/8ackyard/pkg/rnd"
@@ -68,7 +66,6 @@ type Config struct {
 	db       *gorm.DB
 	options  *Options
 	settings *Settings
-	hub      *hub.Config
 	token    string
 	serial   string
 }
@@ -179,7 +176,6 @@ func (c *Config) Init() error {
 	}
 
 	// Set User Agent for HTTP requests.
-	places.UserAgent = fmt.Sprintf("%s/%s", c.Name(), c.Version())
 
 	c.initSettings()
 	c.initHub()
@@ -529,47 +525,3 @@ func (c *Config) OriginalsLimit() int64 {
 }
 
 // UpdateHub updates backend api credentials for maps & places.
-func (c *Config) UpdateHub() {
-	if err := c.hub.Refresh(); err != nil {
-		log.Debugf("config: %s", err)
-	} else if err := c.hub.Save(); err != nil {
-		log.Debugf("config: %s", err)
-	} else {
-		c.hub.Propagate()
-	}
-}
-
-// initHub initializes  hub config.
-func (c *Config) initHub() {
-	c.hub = hub.NewConfig(c.Version(), c.HubConfigFile(), c.serial)
-
-	if err := c.hub.Load(); err == nil {
-		// Do nothing.
-	} else if err := c.hub.Refresh(); err != nil {
-		log.Debugf("config: %s", err)
-	} else if err := c.hub.Save(); err != nil {
-		log.Debugf("config: %s", err)
-	}
-
-	c.hub.Propagate()
-
-	ticker := time.NewTicker(time.Hour * 24)
-
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				c.UpdateHub()
-			}
-		}
-	}()
-}
-
-// Hub returns the  hub config.
-func (c *Config) Hub() *hub.Config {
-	if c.hub == nil {
-		c.initHub()
-	}
-
-	return c.hub
-}
