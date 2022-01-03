@@ -12,7 +12,7 @@ import (
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
 
-	"github.com/photoprism/photoprism/pkg/fs"
+	"github.com/njhsi/8ackyard/pkg/fs"
 )
 
 // Database drivers (sql dialects).
@@ -30,7 +30,7 @@ const (
 //
 // 2. Paths might actually be dynamic later (if we build a multi-user version).
 //
-// See https://github.com/photoprism/photoprism/issues/50#issuecomment-433856358
+// See https://github.com/njhsi/8ackyard/issues/50#issuecomment-433856358
 type Options struct {
 	Name                  string  `json:"-"`
 	Version               string  `json:"-"`

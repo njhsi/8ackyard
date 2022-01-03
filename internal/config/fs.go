@@ -7,8 +7,8 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/photoprism/photoprism/pkg/fs"
-	"github.com/photoprism/photoprism/pkg/sanitize"
+	"github.com/njhsi/8ackyard/pkg/fs"
+	"github.com/njhsi/8ackyard/pkg/sanitize"
 )
 
 func findExecutable(configBin, defaultBin string) (result string) {
@@ -44,7 +44,7 @@ func (c *Config) CreateDirectories() error {
 	}
 
 	notFoundError := func(name string) error {
-		return fmt.Errorf("%s path not found, run 'photoprism config' to check configuration options", name)
+		return fmt.Errorf("%s path not found, run '8ackyard config' to check configuration options", name)
 	}
 
 	if c.AssetsPath() == "" {
@@ -175,7 +175,7 @@ func (c *Config) SettingsFile() string {
 // PIDFilename returns the filename for storing the server process id (pid).
 func (c *Config) PIDFilename() string {
 	if c.options.PIDFilename == "" {
-		return filepath.Join(c.StoragePath(), "photoprism.pid")
+		return filepath.Join(c.StoragePath(), "8ackyard.pid")
 	}
 
 	return fs.Abs(c.options.PIDFilename)
@@ -184,7 +184,7 @@ func (c *Config) PIDFilename() string {
 // LogFilename returns the filename for storing server logs.
 func (c *Config) LogFilename() string {
 	if c.options.LogFilename == "" {
-		return filepath.Join(c.StoragePath(), "photoprism.log")
+		return filepath.Join(c.StoragePath(), "8ackyard.log")
 	}
 
 	return fs.Abs(c.options.LogFilename)
@@ -253,7 +253,7 @@ func (c *Config) SidecarWritable() bool {
 // TempPath returns a temporary directory name for uploads and downloads.
 func (c *Config) TempPath() string {
 	if c.options.TempPath == "" {
-		return filepath.Join(os.TempDir(), "photoprism")
+		return filepath.Join(os.TempDir(), "8ackyard")
 	}
 
 	return fs.Abs(c.options.TempPath)
@@ -289,7 +289,7 @@ func (c *Config) StoragePath() string {
 			return fs.Abs(filepath.Join(c.options.BackupPath, dirName))
 		}
 
-		// Use .photoprism in home directory?
+		// Use .8ackyard in home directory?
 		if usr, _ := user.Current(); usr.HomeDir != "" {
 			p := fs.Abs(filepath.Join(usr.HomeDir, fs.HiddenPath, dirName))
 
@@ -303,7 +303,7 @@ func (c *Config) StoragePath() string {
 			return fs.Abs(filepath.Join(fs.HiddenPath, dirName))
 		}
 
-		// Store cache and index in "originals/.photoprism/storage".
+		// Store cache and index in "originals/.8ackyard/storage".
 		return originalsDir
 	}
 

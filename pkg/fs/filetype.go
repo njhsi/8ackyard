@@ -45,7 +45,7 @@ const (
 	FormatOther    FileFormat = ""     // Unknown file format.
 )
 
-// FileExt contains the filename extensions of file formats known to PhotoPrism.
+// FileExt contains the filename extensions of file formats known to
 var FileExt = FileExtensions{
 	".bmp":  FormatBitmap,
 	".gif":  FormatGif,

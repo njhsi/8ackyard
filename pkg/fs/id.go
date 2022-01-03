@@ -3,7 +3,7 @@ package fs
 import (
 	"regexp"
 
-	"github.com/photoprism/photoprism/pkg/rnd"
+	"github.com/njhsi/8ackyard/pkg/rnd"
 )
 
 var DscNameRegexp = regexp.MustCompile("\\D{3}[\\d_]\\d{4,8}_?\\d{0,6}_?\\d{0,6}[\\.jpgJPGXx]{0,4}")

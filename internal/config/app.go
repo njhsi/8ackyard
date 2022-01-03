@@ -4,8 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/photoprism/photoprism/pkg/fs"
-	"github.com/photoprism/photoprism/pkg/txt"
+	"github.com/njhsi/8ackyard/pkg/fs"
 )
 
 // AppIcon returns the app icon when installed on a device.
@@ -51,7 +50,8 @@ func (c *Config) AppName() string {
 
 	name = strings.Map(clean, name)
 
-	return txt.Clip(name, 32)
+	//	return txt.Clip(name, 32)
+	return "8ackyard"
 }
 
 // AppMode returns the app mode when installed on a device.

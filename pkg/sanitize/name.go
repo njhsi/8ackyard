@@ -2,8 +2,6 @@ package sanitize
 
 import (
 	"strings"
-
-	"github.com/photoprism/photoprism/pkg/txt"
 )
 
 // Name sanitizes and capitalizes names.
@@ -28,5 +26,5 @@ func Name(name string) string {
 	}
 
 	// Shorten and capitalize.
-	return txt.Clip(txt.Title(name), txt.ClipDefault)
+	return name
 }

@@ -14,8 +14,8 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"github.com/photoprism/photoprism/internal/entity"
-	"github.com/photoprism/photoprism/internal/mutex"
+	"github.com/njhsi/8ackyard/internal/entity"
+	"github.com/njhsi/8ackyard/internal/mutex"
 )
 
 var dsnPattern = regexp.MustCompile(
@@ -144,7 +144,7 @@ func (c *Config) DatabaseName() string {
 	c.ParseDatabaseDsn()
 
 	if c.options.DatabaseName == "" {
-		return "photoprism"
+		return "8ackyard"
 	}
 
 	return c.options.DatabaseName
@@ -155,7 +155,7 @@ func (c *Config) DatabaseUser() string {
 	c.ParseDatabaseDsn()
 
 	if c.options.DatabaseUser == "" {
-		return "photoprism"
+		return "8ackyard"
 	}
 
 	return c.options.DatabaseUser

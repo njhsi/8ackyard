@@ -22,13 +22,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/njhsi/8ackyard/internal/entity"
 	"github.com/njhsi/8ackyard/internal/event"
-	"github.com/njhsi/8ackyard/internal/face"
 	"github.com/njhsi/8ackyard/internal/hub"
 	"github.com/njhsi/8ackyard/internal/hub/places"
 	"github.com/njhsi/8ackyard/internal/mutex"
-	"github.com/njhsi/8ackyard/internal/thumb"
 	"github.com/njhsi/8ackyard/pkg/fs"
 	"github.com/njhsi/8ackyard/pkg/rnd"
 	"github.com/njhsi/8ackyard/pkg/sanitize"
@@ -40,7 +37,7 @@ var LowMem = false
 var TotalMem uint64
 
 const MsgSponsor = "Help us make a difference and become a sponsor today!"
-const SignUpURL = "https://docs.photoprism.app/funding/"
+const SignUpURL = ""
 const MsgSignUp = "Visit " + SignUpURL + " to learn more."
 const MsgSponsorCommand = "Since running this command puts additional load on our infrastructure," +
 	" we unfortunately can only offer it to sponsors."
@@ -65,7 +62,7 @@ const MinMem = Gigabyte
 // RecommendedMem is the recommended amount of system memory.
 const RecommendedMem = 5 * Gigabyte
 
-// Config holds database, cache and all parameters of photoprism
+// Config holds database, cache and all parameters of
 type Config struct {
 	once     sync.Once
 	db       *gorm.DB
@@ -80,20 +77,11 @@ func init() {
 	TotalMem = memory.TotalMemory()
 
 	// Check available memory if not running in unsafe mode.
-	if os.Getenv("PHOTOPRISM_UNSAFE") == "" {
+	if os.Getenv("BACKYARD_UNSAFE") == "" {
 		// Disable features with high memory requirements?
 		LowMem = TotalMem < MinMem
 	}
 
-	// Init public thumb sizes for use in client apps.
-	for i := len(thumb.DefaultSizes) - 1; i >= 0; i-- {
-		name := thumb.DefaultSizes[i]
-		t := thumb.Sizes[name]
-
-		if t.Public {
-			Thumbs = append(Thumbs, ThumbSize{Size: string(name), Use: t.Use, Width: t.Width, Height: t.Height})
-		}
-	}
 }
 
 func initLogger(debug bool) {
@@ -145,24 +133,7 @@ func (c *Config) Options() *Options {
 func (c *Config) Propagate() {
 	log.SetLevel(c.LogLevel())
 
-	// Set thumbnail generation parameters.
-	thumb.SizePrecached = c.ThumbSizePrecached()
-	thumb.SizeUncached = c.ThumbSizeUncached()
-	thumb.Filter = c.ThumbFilter()
-	thumb.JpegQuality = c.JpegQuality()
-
-	// Set geocoding parameters.
-	places.UserAgent = c.UserAgent()
-	entity.GeoApi = c.GeoApi()
-
 	// Set facial recognition parameters.
-	face.ScoreThreshold = c.FaceScore()
-	face.OverlapThreshold = c.FaceOverlap()
-	face.ClusterScoreThreshold = c.FaceClusterScore()
-	face.ClusterSizeThreshold = c.FaceClusterSize()
-	face.ClusterCore = c.FaceClusterCore()
-	face.ClusterDist = c.FaceClusterDist()
-	face.MatchDist = c.FaceMatchDist()
 
 	c.Settings().Propagate()
 	c.Hub().Propagate()
@@ -266,7 +237,7 @@ func (c *Config) SerialChecksum() string {
 	return hex.EncodeToString(hash.Sum(result))
 }
 
-// Name returns the application name ("PhotoPrism").
+// Name returns the application name ("").
 func (c *Config) Name() string {
 	return c.options.Name
 }
@@ -460,7 +431,6 @@ func (c *Config) Shutdown() {
 	mutex.ShareWorker.Cancel()
 	mutex.SyncWorker.Cancel()
 	mutex.MetaWorker.Cancel()
-	mutex.FacesWorker.Cancel()
 
 	if err := c.CloseDb(); err != nil {
 		log.Errorf("could not close database connection: %s", err)
@@ -569,7 +539,7 @@ func (c *Config) UpdateHub() {
 	}
 }
 
-// initHub initializes PhotoPrism hub config.
+// initHub initializes  hub config.
 func (c *Config) initHub() {
 	c.hub = hub.NewConfig(c.Version(), c.HubConfigFile(), c.serial)
 
@@ -595,7 +565,7 @@ func (c *Config) initHub() {
 	}()
 }
 
-// Hub returns the PhotoPrism hub config.
+// Hub returns the  hub config.
 func (c *Config) Hub() *hub.Config {
 	if c.hub == nil {
 		c.initHub()
