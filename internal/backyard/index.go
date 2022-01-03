@@ -128,11 +128,11 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 			if skip, result := fs.SkipWalk(fileName, isDir, isSymlink, done, ignore); skip {
 				if (isSymlink || isDir) && result != filepath.SkipDir {
-					folder := entity.NewFolder(entity.RootOriginals, relName, fs.BirthTime(fileName))
+					//	folder := entity.NewFolder(entity.RootOriginals, relName, fs.BirthTime(fileName))
 
-					if err := folder.Create(); err == nil {
-						log.Infof("index: added folder /%s", folder.Path)
-					}
+					//	if err := folder.Create(); err == nil {
+					log.Infof("index: added folder /%s", folder.Path)
+					//					}
 				}
 
 				if isDir {
@@ -147,6 +147,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			done[fileName] = fs.Found
 
 			if !fs.IsMedia(fileName) {
+				log.Infof("index: not media file /%s", fileName)
 				return nil
 			}
 
@@ -162,11 +163,11 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 				return nil
 			}
 
-			if ind.files.Indexed(relName, entity.RootOriginals, mf.modTime, opt.Rescan) {
+			if ind.files.Indexed(relName, "/", mf.modTime, opt.Rescan) {
 				return nil
 			}
 
-			related, err := mf.RelatedFiles(ind.conf.Settings().StackSequences())
+			related, err := mf.RelatedFiles(false)
 
 			if err != nil {
 				log.Warnf("index: %s", err.Error())

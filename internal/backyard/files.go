@@ -1,7 +1,6 @@
 package backyard
 
 import (
-	"fmt"
 	"path"
 	"sync"
 	"time"
@@ -35,15 +34,13 @@ func (m *Files) Init() error {
 		return nil
 	}
 
-	files, err := query.IndexedFiles()
+	//	files, err := query.IndexedFiles()
+	files := make(FileMap)
 
-	if err != nil {
-		return fmt.Errorf("%s (find indexed files)", err.Error())
-	} else {
-		m.files = files
-		m.count = len(files)
-		return nil
-	}
+	m.files = files
+	m.count = len(files)
+	return nil
+
 }
 
 // Done should be called after all files have been processed.
