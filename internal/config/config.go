@@ -12,10 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/mysql"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
-
 	"github.com/dustin/go-humanize"
 	"github.com/klauspost/cpuid/v2"
 	"github.com/pbnjay/memory"
@@ -33,15 +29,6 @@ var log = event.Log
 var once sync.Once
 var LowMem = false
 var TotalMem uint64
-
-const MsgSponsor = "Help us make a difference and become a sponsor today!"
-const SignUpURL = ""
-const MsgSignUp = "Visit " + SignUpURL + " to learn more."
-const MsgSponsorCommand = "Since running this command puts additional load on our infrastructure," +
-	" we unfortunately can only offer it to sponsors."
-
-const ApiUri = "/api/v1"    // REST API
-const StaticUri = "/static" // Static Content
 
 const DefaultAutoIndexDelay = int(5 * 60)  // 5 Minutes
 const DefaultAutoImportDelay = int(3 * 60) // 3 Minutes
@@ -62,12 +49,10 @@ const RecommendedMem = 5 * Gigabyte
 
 // Config holds database, cache and all parameters of
 type Config struct {
-	once     sync.Once
-	db       *gorm.DB
-	options  *Options
-	settings *Settings
-	token    string
-	serial   string
+	once    sync.Once
+	options *Options
+	token   string
+	serial  string
 }
 
 func init() {
@@ -132,8 +117,6 @@ func (c *Config) Propagate() {
 
 	// Set facial recognition parameters.
 
-	c.Settings().Propagate()
-	c.Hub().Propagate()
 }
 
 // Init creates directories, parses additional config files, opens a database connection and initializes dependencies.
@@ -144,12 +127,6 @@ func (c *Config) Init() error {
 
 	if err := c.initStorage(); err != nil {
 		return err
-	}
-
-	// Show funding info?
-	if !c.Sponsor() {
-		log.Info(MsgSponsor)
-		log.Info(MsgSignUp)
 	}
 
 	if insensitive, err := c.CaseInsensitive(); err != nil {
@@ -177,12 +154,9 @@ func (c *Config) Init() error {
 
 	// Set User Agent for HTTP requests.
 
-	c.initSettings()
-	c.initHub()
-
 	c.Propagate()
+	return nil
 
-	return c.connectDb()
 }
 
 // initStorage initializes storage directories with a random serial.
@@ -268,24 +242,9 @@ func (c *Config) BaseUri(res string) string {
 	return strings.TrimRight(u.Path, "/") + res
 }
 
-// ApiUri returns the api URI.
-func (c *Config) ApiUri() string {
-	return c.BaseUri(ApiUri)
-}
-
 // CdnUrl returns the optional content delivery network URI without trailing slash.
 func (c *Config) CdnUrl(res string) string {
 	return strings.TrimRight(c.options.CdnUrl, "/") + res
-}
-
-// ContentUri returns the content delivery URI.
-func (c *Config) ContentUri() string {
-	return c.CdnUrl(c.ApiUri())
-}
-
-// StaticUri returns the static content URI.
-func (c *Config) StaticUri() string {
-	return c.CdnUrl(c.BaseUri(StaticUri))
 }
 
 // SiteUrl returns the public server URL (default is "http://localhost:2342/").
@@ -428,11 +387,6 @@ func (c *Config) Shutdown() {
 	mutex.SyncWorker.Cancel()
 	mutex.MetaWorker.Cancel()
 
-	if err := c.CloseDb(); err != nil {
-		log.Errorf("could not close database connection: %s", err)
-	} else {
-		log.Info("closed database connection")
-	}
 }
 
 // Workers returns the number of workers e.g. for indexing files.
@@ -448,11 +402,6 @@ func (c *Config) Workers() int {
 	// Limit to physical cores to avoid high load on HT capable CPUs.
 	if cores > cpuid.CPU.PhysicalCores {
 		cores = cpuid.CPU.PhysicalCores
-	}
-
-	// Limit number of workers when using SQLite3 to avoid database locking issues.
-	if c.DatabaseDriver() == SQLite3 && (cores >= 8 && c.options.Workers <= 0 || c.options.Workers > 4) {
-		return 4
 	}
 
 	// Return explicit value if set and not too large.

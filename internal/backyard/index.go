@@ -12,7 +12,6 @@ import (
 	"github.com/karrick/godirwalk"
 
 	"github.com/njhsi/8ackyard/internal/config"
-	"github.com/njhsi/8ackyard/internal/entity"
 	"github.com/njhsi/8ackyard/internal/event"
 	"github.com/njhsi/8ackyard/internal/mutex"
 	"github.com/njhsi/8ackyard/pkg/fs"
@@ -21,30 +20,24 @@ import (
 
 // Index represents an indexer that indexes files in the originals directory.
 type Index struct {
-	conf       *config.Config
-	files      *Files
-	photos     *Photos
-	findFaces  bool
-	findLabels bool
+	conf *config.Config
+	//	convert *Convert
+	files  *Files
+	photos *Photos
 }
 
 // NewIndex returns a new indexer and expects its dependencies as arguments.
-func NewIndex(conf *config.Config, tensorFlow *classify.TensorFlow, nsfwDetector *nsfw.Detector, faceNet *face.Net, convert *Convert, files *Files, photos *Photos) *Index {
+func NewIndex(conf *config.Config, files *Files, photos *Photos) *Index {
 	if conf == nil {
 		log.Errorf("index: config is nil")
 		return nil
 	}
 
 	i := &Index{
-		conf:         conf,
-		tensorFlow:   tensorFlow,
-		nsfwDetector: nsfwDetector,
-		faceNet:      faceNet,
-		convert:      convert,
-		files:        files,
-		photos:       photos,
-		findFaces:    !conf.DisableFaces(),
-		findLabels:   !conf.DisableClassification(),
+		conf: conf,
+		//		convert: convert,
+		files:  files,
+		photos: photos,
 	}
 
 	return i
@@ -52,10 +45,6 @@ func NewIndex(conf *config.Config, tensorFlow *classify.TensorFlow, nsfwDetector
 
 func (ind *Index) originalsPath() string {
 	return ind.conf.OriginalsPath()
-}
-
-func (ind *Index) thumbPath() string {
-	return ind.conf.ThumbPath()
 }
 
 // Cancel stops the current indexing operation.
@@ -92,12 +81,6 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	}
 
 	defer mutex.MainWorker.Stop()
-
-	if err := ind.tensorFlow.Init(); err != nil {
-		log.Errorf("index: %s", err.Error())
-
-		return done
-	}
 
 	jobs := make(chan IndexJob)
 
@@ -241,13 +224,6 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		event.Publish("index.updating", event.Data{
 			"step": "faces",
 		})
-
-		// Run facial recognition if enabled.
-		if w := NewFaces(ind.conf); w.Disabled() {
-			log.Debugf("index: skipping facial recognition")
-		} else if err := w.Start(FacesOptionsDefault()); err != nil {
-			log.Errorf("index: %s", err)
-		}
 
 		event.Publish("index.updating", event.Data{
 			"step": "counts",

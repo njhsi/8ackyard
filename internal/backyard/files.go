@@ -5,21 +5,21 @@ import (
 	"path"
 	"sync"
 	"time"
-
-	"github.com/njhsi/8ackyard/internal/query"
 )
+
+type FileMap map[string]uint
 
 // Files represents a list of already indexed file names and their unix modification timestamps.
 type Files struct {
 	count int
-	files query.FileMap
+	files FileMap
 	mutex sync.RWMutex
 }
 
 // NewFiles returns a new Files instance.
 func NewFiles() *Files {
 	m := &Files{
-		files: make(query.FileMap),
+		files: make(FileMap),
 	}
 
 	return m
@@ -33,10 +33,6 @@ func (m *Files) Init() error {
 	if len(m.files) > 0 {
 		m.count = len(m.files)
 		return nil
-	}
-
-	if err := query.PurgeOrphanDuplicates(); err != nil {
-		return fmt.Errorf("%s (purge duplicates)", err.Error())
 	}
 
 	files, err := query.IndexedFiles()
@@ -59,7 +55,7 @@ func (m *Files) Done() {
 	}
 
 	m.count = 0
-	m.files = make(query.FileMap)
+	m.files = make(FileMap)
 }
 
 // Remove a file from the lookup table.

@@ -6,21 +6,10 @@ import (
 	"os"
 	"reflect"
 
-	_ "github.com/jinzhu/gorm/dialects/mysql"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
-
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
 
 	"github.com/njhsi/8ackyard/pkg/fs"
-)
-
-// Database drivers (sql dialects).
-const (
-	MySQL    = "mysql"
-	MariaDB  = "mariadb"
-	SQLite3  = "sqlite3"
-	Postgres = "postgres" // TODO: Requires GORM 2.0 for generic column data types
 )
 
 // Options provides a struct in which application configuration is stored.

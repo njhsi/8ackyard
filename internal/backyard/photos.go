@@ -6,21 +6,21 @@ import (
 	"time"
 
 	"github.com/njhsi/8ackyard/internal/entity"
-
-	"github.com/njhsi/8ackyard/internal/query"
 )
+
+type PhotoMap map[string]uint
 
 // Photos represents photo id lookup table, sorted by date and S2 cell id.
 type Photos struct {
 	count  int
-	photos query.PhotoMap
+	photos PhotoMap
 	mutex  sync.RWMutex
 }
 
 // NewPhotos returns a new Photos instance.
 func NewPhotos() *Photos {
 	m := &Photos{
-		photos: make(query.PhotoMap),
+		photos: make(PhotoMap),
 	}
 
 	return m

@@ -51,8 +51,6 @@ func indexAction(ctx *cli.Context) error {
 		return err
 	}
 
-	conf.InitDb()
-
 	// Use first argument to limit scope if set.
 	subPath := strings.TrimSpace(ctx.Args().First())
 
@@ -71,41 +69,12 @@ func indexAction(ctx *cli.Context) error {
 	if w := service.Index(); w != nil {
 		opt := backyard.IndexOptions{
 			Path:    subPath,
-			Rescan:  ctx.Bool("force"),
-			Convert: conf.Settings().Index.Convert && conf.SidecarWritable(),
+			Rescan:  true,
+			Convert: false,
 			Stack:   true,
 		}
 
 		indexed = w.Start(opt)
-	}
-
-	if w := service.Purge(); w != nil {
-		purgeStart := time.Now()
-		opt := backyard.PurgeOptions{
-			Path:   subPath,
-			Ignore: indexed,
-		}
-
-		if files, photos, err := w.Start(opt); err != nil {
-			log.Error(err)
-		} else if len(files) > 0 || len(photos) > 0 {
-			log.Infof("purge: removed %s and %s [%s]", english.Plural(len(files), "file", "files"), english.Plural(len(photos), "photo", "photos"), time.Since(purgeStart))
-		}
-	}
-
-	if ctx.Bool("cleanup") {
-		cleanupStart := time.Now()
-		w := service.CleanUp()
-
-		opt := backyard.CleanUpOptions{
-			Dry: false,
-		}
-
-		if thumbs, orphans, err := w.Start(opt); err != nil {
-			return err
-		} else {
-			log.Infof("cleanup: removed %s and %s [%s]", english.Plural(orphans, "index entry", "index entries"), english.Plural(thumbs, "thumbnail", "thumbnails"), time.Since(cleanupStart))
-		}
 	}
 
 	elapsed := time.Since(start)
