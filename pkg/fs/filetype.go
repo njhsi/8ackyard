@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/h2non/filetype"
 )
 
 type FileFormat string
@@ -213,6 +215,18 @@ func GetFileFormat(fileName string) FileFormat {
 
 	if !ok {
 		result = FormatOther
+	}
+
+	// nj: try harder..
+	//ok = false
+	if !ok {
+		if typ, err := filetype.MatchFile(fileName); err == nil {
+			result, ok = FileExt["."+typ.Extension]
+			if !ok {
+				result = FormatOther
+			}
+			println("GetFileFormat:", typ.Extension, typ.MIME.Value, fileName, result)
+		}
 	}
 
 	return result
