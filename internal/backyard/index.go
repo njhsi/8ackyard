@@ -113,11 +113,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 			if skip, result := fs.SkipWalk(fileName, isDir, isSymlink, done, ignore); skip {
 				if (isSymlink || isDir) && result != filepath.SkipDir {
-					//	folder := entity.NewFolder(entity.RootOriginals, relName, fs.BirthTime(fileName))
-
-					//	if err := folder.Create(); err == nil {
 					log.Infof("index: added folder /%s", fileName)
-					//					}
 				}
 
 				if isDir {
@@ -150,43 +146,10 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 				return nil
 			}
 
-			related, err := mf.RelatedFiles(false)
-
-			if err != nil {
-				log.Warnf("index: %s", err.Error())
-
-				return nil
-			}
-
-			var files MediaFiles
-
-			for _, f := range related.Files {
-				if done[f.FileName()].Processed() {
-					continue
-				}
-
-				if f.FileSize() == 0 || ind.files.Indexed(f.RootRelName(), f.Root(), f.ModTime(), opt.Rescan) {
-					done[f.FileName()] = fs.Found
-					continue
-				}
-
-				files = append(files, f)
-				filesIndexed++
-				done[f.FileName()] = fs.Processed
-			}
-
 			done[fileName] = fs.Processed
-
-			if len(files) == 0 || related.Main == nil {
-				// Nothing to do.
-				return nil
-			}
-
-			related.Files = files
 
 			jobs <- IndexJob{
 				FileName: mf.FileName(),
-				Related:  related,
 				IndexOpt: opt,
 				Ind:      ind,
 			}
@@ -216,27 +179,4 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	runtime.GC()
 
 	return done
-}
-
-// FileName indexes a single file and returns the result.
-func (ind *Index) FileName(fileName string, o IndexOptions) (result IndexResult) {
-	file, err := NewMediaFile(fileName)
-
-	if err != nil {
-		result.Err = err
-		result.Status = IndexFailed
-
-		return result
-	}
-
-	related, err := file.RelatedFiles(false)
-
-	if err != nil {
-		result.Err = err
-		result.Status = IndexFailed
-
-		return result
-	}
-
-	return IndexRelated(related, ind, o)
 }

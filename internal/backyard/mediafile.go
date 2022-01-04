@@ -11,8 +11,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"regexp"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -272,76 +270,6 @@ func (m *MediaFile) EditedName() string {
 }
 
 // RelatedFiles returns files which are related to this file.
-func (m *MediaFile) RelatedFiles(stripSequence bool) (result RelatedFiles, err error) {
-	var prefix string
-
-	if stripSequence {
-		// Strip common name sequences like "copy 2" and escape meta characters.
-		prefix = regexp.QuoteMeta(m.AbsPrefix(true))
-	} else {
-		// Use strict file name matching and escape meta characters.
-		prefix = regexp.QuoteMeta(m.AbsPrefix(false) + ".")
-	}
-
-	// Find related files.
-	matches, err := filepath.Glob(prefix + "*")
-
-	if err != nil {
-		return result, err
-	}
-
-	if name := m.EditedName(); name != "" {
-		matches = append(matches, name)
-	}
-
-	for _, fileName := range matches {
-		f, err := NewMediaFile(fileName)
-
-		if err != nil {
-			log.Warnf("media: %s in %s", err, sanitize.Log(filepath.Base(fileName)))
-			continue
-		}
-
-		if f.FileSize() == 0 {
-			log.Warnf("media: %s is empty", sanitize.Log(filepath.Base(fileName)))
-			continue
-		}
-
-		if result.Main == nil && f.IsJpeg() {
-			result.Main = f
-		} else if f.IsRaw() {
-			result.Main = f
-		} else if f.IsHEIF() {
-			result.Main = f
-		} else if f.IsImageOther() {
-			result.Main = f
-		} else if f.IsVideo() {
-			result.Main = f
-		} else if result.Main != nil && f.IsJpeg() {
-			if result.Main.IsJpeg() && len(result.Main.FileName()) > len(f.FileName()) {
-				result.Main = f
-			}
-		}
-
-		result.Files = append(result.Files, f)
-	}
-
-	if len(result.Files) == 0 || result.Main == nil {
-		t := m.MimeType()
-
-		if t == "" {
-			t = "unknown type"
-		}
-
-		return result, fmt.Errorf("no supported files found for %s (%s)", sanitize.Log(m.BaseName()), t)
-	}
-
-	// Add hidden JPEG if exists.
-
-	sort.Sort(result.Files)
-
-	return result, nil
-}
 
 // PathNameInfo returns file name infos for indexing.
 func (m *MediaFile) PathNameInfo(stripSequence bool) (fileRoot, fileBase, relativePath, relativeName string) {
