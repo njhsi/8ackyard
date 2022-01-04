@@ -37,6 +37,7 @@ type MediaFile struct {
 	takenAtSrc   string
 	hash         string
 	checksum     string
+	md5sum       string
 	hasJpeg      bool
 	width        int
 	height       int
@@ -115,6 +116,7 @@ func (m *MediaFile) TakenAt() (time.Time, string) {
 	if data.Error == nil && !data.TakenAt.IsZero() && data.TakenAt.Year() > 1000 {
 		m.takenAt = data.TakenAt.UTC()
 		//		m.takenAtSrc = entity.SrcMeta
+		m.takenAtSrc = "meta"
 
 		log.Infof("media: %s was taken at %s (%s)", filepath.Base(m.fileName), m.takenAt.String(), m.takenAtSrc)
 
@@ -124,13 +126,14 @@ func (m *MediaFile) TakenAt() (time.Time, string) {
 	if nameTime := txt.Time(m.fileName); !nameTime.IsZero() {
 		m.takenAt = nameTime
 		//		m.takenAtSrc = entity.SrcName
+		m.takenAtSrc = "name"
 
 		log.Infof("media: %s was taken at %s (%s)", filepath.Base(m.fileName), m.takenAt.String(), m.takenAtSrc)
 
 		return m.takenAt, m.takenAtSrc
 	}
 
-	//	m.takenAtSrc = entity.SrcAuto
+	m.takenAtSrc = "auto"
 
 	fileInfo, err := times.Stat(m.FileName())
 
@@ -236,6 +239,14 @@ func (m *MediaFile) CanonicalNameFromFile() string {
 // including the directory.
 func (m *MediaFile) CanonicalNameFromFileWithDirectory() string {
 	return m.Dir() + string(os.PathSeparator) + m.CanonicalNameFromFile()
+}
+
+func (m *MediaFile) Md5sum() string {
+	if len(m.md5sum) == 0 {
+		m.md5sum = fs.Md5sum(m.FileName())
+	}
+
+	return m.md5sum
 }
 
 // Hash returns the SHA1 hash of a media file.

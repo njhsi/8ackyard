@@ -43,13 +43,16 @@ func index_main(fileName string, ind *Index, opt IndexOptions) (result IndexResu
 			log.Debugf("index: %s in %s (extract metadata)", sanitize.Log(err.Error()), sanitize.Log(f.BaseName()))
 		} else {
 			log.Debugf("index: created %s", filepath.Base(jsonName))
+			f.ReadExifToolJson()
 		}
 	}
 
 	//	result = ind.MediaFile(f, opt, "")
 	result.Status = IndexAdded
+	takenAt, src := f.TakenAt()
+	ind.files.Add(f)
 
-	log.Infof("index: %s main %s file %s", result, f.FileType(), sanitize.Log(f.RelName(ind.originalsPath())))
+	log.Infof("index: %s ma!n %s file %s %s.%s", result, f.FileType(), sanitize.Log(f.RelName(ind.originalsPath())), takenAt, src)
 
 	return result
 }

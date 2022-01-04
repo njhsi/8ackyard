@@ -1,12 +1,28 @@
 package fs
 
 import (
+	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
 	"hash/crc32"
 	"io"
 	"os"
 )
+
+func Md5sum(fileName string) string {
+	var result []byte
+	file, err := os.Open(fileName)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+	md5sum := md5.New()
+	if _, err := io.Copy(md5sum, file); err != nil {
+		return ""
+	}
+
+	return hex.EncodeToString(md5sum.Sum(result))
+}
 
 // Hash returns the SHA1 hash of a file as string.
 func Hash(fileName string) string {

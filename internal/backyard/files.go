@@ -7,18 +7,21 @@ import (
 )
 
 type FileMap map[string]int64
+type MediafilesMap map[int64]MediaFiles //filesize:MFs
 
 // Files represents a list of already indexed file names and their unix modification timestamps.
 type Files struct {
-	count int
-	files FileMap
-	mutex sync.RWMutex
+	count  int
+	files  FileMap
+	mfiles MediafilesMap
+	mutex  sync.RWMutex
 }
 
 // NewFiles returns a new Files instance.
 func NewFiles() *Files {
 	m := &Files{
-		files: make(FileMap),
+		files:  make(FileMap),
+		mfiles: make(MediafilesMap),
 	}
 
 	return m
@@ -37,6 +40,7 @@ func (m *Files) Init() error {
 	//	files, err := query.IndexedFiles()
 	files := make(FileMap)
 
+	m.mfiles = make(MediafilesMap)
 	m.files = files
 	m.count = len(files)
 	return nil
@@ -63,6 +67,19 @@ func (m *Files) Remove(fileName, fileRoot string) {
 	defer m.mutex.Unlock()
 
 	delete(m.files, key)
+}
+
+func (m *Files) Add(mf *MediaFile) {
+	if mf == nil {
+		return
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	fileSize := mf.FileSize()
+	mfs := m.mfiles[fileSize]
+	mfs = append(mfs, mf)
+	m.mfiles[fileSize] = mfs
 }
 
 // Ignore tests of a file requires indexing, file name must be relative to the originals path.
