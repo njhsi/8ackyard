@@ -7,7 +7,6 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/karrick/godirwalk"
 
@@ -72,13 +71,14 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	// Start a fixed number of goroutines to index files.
 	var wg sync.WaitGroup
-	var numWorkers = 5
+	var numWorkers = 8
 	wg.Add(numWorkers)
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			IndexWorker(jobs) // HLc
 			wg.Done()
 		}()
+
 	}
 
 	if err := ind.files.Init(); err != nil {
@@ -163,6 +163,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	close(jobs)
 	wg.Wait()
+	log.Infof("index completed .. wg.Wait done")
 
 	if err != nil {
 		log.Error(err.Error())
@@ -179,44 +180,26 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	runtime.GC()
 
-	// copy to destine
+	// BACKUP to destine
+	jobs2 := make(chan BackupJob)
+	wg.Add(numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			BackupWorker(jobs2)
+			wg.Done()
+		}()
+	}
 	for kFileSize, vMfiles := range ind.files.mfiles {
 		log.Infof("backup: size=%d, %d mfs", kFileSize, len(vMfiles))
-		sumMfiles := map[string]MediaFiles{}
-		for _, mf := range vMfiles {
-			sumMfiles[mf.Md5sum()] = append(sumMfiles[mf.Md5sum()], mf)
-		}
-		for _, mfs := range sumMfiles { //TODO: job the vMfiles of each md5sum
-			var mfBest *MediaFile = nil
-			for _, mf := range mfs {
-				//TODO: save dups info into a txt file, in case ..
-				takenAt, src := mf.TakenAt()
-				log.Infof("backup: mf=%s md5=%s takenat=%s src=%s", mf.FileName(), mf.Md5sum(), takenAt, src)
-				if src == "meta" {
-					mfBest = mf
-					break
-				} else {
-					if mfBest == nil {
-						mfBest = mf
-					} else {
-						takenAtBest, _ := mfBest.TakenAt()
-						if takenAt.Before(takenAtBest) {
-							mfBest = mf
-						}
-					}
-				}
-			}
-			//do!
-			if mfBest != nil {
-				loc, _ := time.LoadLocation("Asia/Chongqing")
-				takenAt, src := mfBest.TakenAt()
-				takenAt = takenAt.In(loc)
-				folder := takenAt.Format("2006/01/02")
-				log.Infof("backup: DO!! %s=>%s %s %s", mfBest.FileName(), folder, takenAt, src)
-				mfBest.Copy("/tmp/Backup/" + folder + "/" + mfBest.BaseName())
-			}
+		jobs2 <- BackupJob{
+			IndexOpt: opt,
+			Ind:      ind,
+			MFiles:   vMfiles,
 		}
 	}
+	close(jobs2)
+	wg.Wait()
+	runtime.GC()
 
 	return done
 }

@@ -3,6 +3,7 @@ package backyard
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/pkg/sanitize"
@@ -16,7 +17,7 @@ type IndexJob struct {
 
 func IndexWorker(jobs <-chan IndexJob) {
 	for job := range jobs {
-		log.Infof("IndexWorker:                           %s", job.FileName)
+		log.Infof("IndexWorker:                           fileName=%s", job.FileName)
 		index_main(job.FileName, job.Ind, job.IndexOpt)
 	}
 }
@@ -54,5 +55,58 @@ func index_main(fileName string, ind *Index, opt IndexOptions) (result IndexResu
 
 	log.Infof("index: %s ma!n %s file %s %s.%s", result, f.FileType(), sanitize.Log(f.RelName(ind.originalsPath())), takenAt, src)
 
+	return result
+}
+
+type BackupJob struct {
+	IndexOpt IndexOptions
+	Ind      *Index
+	MFiles   MediaFiles
+}
+
+func BackupWorker(jobs <-chan BackupJob) {
+	for job := range jobs {
+		log.Infof("BackupWorker:                           mfs=%d", len(job.MFiles))
+		backup_main(job.MFiles, job.Ind, job.IndexOpt)
+	}
+}
+
+func backup_main(mFiles MediaFiles, ind *Index, opt IndexOptions) (result IndexResult) {
+	sumMfiles := map[string]MediaFiles{}
+	for _, mf := range mFiles {
+		sumMfiles[mf.Md5sum()] = append(sumMfiles[mf.Md5sum()], mf)
+	}
+	for _, mfs := range sumMfiles { //TODO: job the vMfiles of each md5sum
+		var mfBest *MediaFile = nil
+		for _, mf := range mfs {
+			//TODO: save dups info into a txt file, in case ..
+			takenAt, src := mf.TakenAt()
+			log.Infof("backup: mf=%s md5=%s takenat=%s src=%s", mf.FileName(), mf.Md5sum(), takenAt, src)
+			if src == "meta" {
+				mfBest = mf
+				break
+			} else {
+				if mfBest == nil {
+					mfBest = mf
+				} else {
+					takenAtBest, _ := mfBest.TakenAt()
+					if takenAt.Before(takenAtBest) {
+						mfBest = mf
+					}
+				}
+			}
+		}
+		//do!
+		if mfBest != nil {
+			loc, _ := time.LoadLocation("Asia/Chongqing")
+			takenAt, src := mfBest.TakenAt()
+			takenAt = takenAt.In(loc)
+			folder := takenAt.Format("2006/01/02")
+			log.Infof("backup: DO!! [ %s => %s ], %s %s", mfBest.FileName(), folder, takenAt, src)
+			mfBest.Copy("/tmp/Backup/" + folder + "/" + mfBest.BaseName())
+		}
+	}
+
+	result.Status = IndexAdded
 	return result
 }
