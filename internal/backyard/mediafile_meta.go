@@ -4,36 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/meta"
 	"github.com/njhsi/8ackyard/pkg/fs"
-	"github.com/njhsi/8ackyard/pkg/sanitize"
 )
-
-// HasSidecarJson returns true if this file has or is a json sidecar file.
-func (m *MediaFile) HasSidecarJson() bool {
-	if m.IsJson() {
-		return true
-	}
-
-	return fs.FormatJson.FindFirst(m.FileName(), []string{Config().SidecarPath(), fs.HiddenPath}, Config().OriginalsPath(), false) != ""
-}
-
-// SidecarJsonName returns the corresponding JSON sidecar file name as used by Google Photos (and potentially other apps).
-func (m *MediaFile) SidecarJsonName() string {
-	jsonName := m.fileName + ".json"
-
-	if fs.FileExists(jsonName) {
-		return jsonName
-	}
-
-	return ""
-}
 
 // ExifToolJsonName returns the cached ExifTool metadata file name.
 func (m *MediaFile) ExifToolJsonName() (string, error) {
-	if Config().DisableExifTool() {
-		return "", fmt.Errorf("media: exiftool json files disabled")
-	}
 
 	return CacheName(m.Hash(), "json", "exiftool.json")
 }
@@ -77,8 +54,8 @@ func (m *MediaFile) MetaData() (result meta.Data) {
 
 		// Parse regular JSON sidecar files ("img_1234.json")
 		if !m.IsSidecar() {
-			if jsonFiles := fs.FormatJson.FindAll(m.FileName(), []string{Config().SidecarPath(), fs.HiddenPath}, Config().OriginalsPath(), false); len(jsonFiles) == 0 {
-				log.Tracef("metadata: found no additional sidecar file for %s", sanitize.Log(filepath.Base(m.FileName())))
+			if jsonFiles := fs.FormatJson.FindAll(m.FileName(), []string{config.SidecarPath(), fs.HiddenPath}, config.OriginalsPath(), false); len(jsonFiles) == 0 {
+				log.Tracef("metadata: found no additional sidecar file for %s", filepath.Base(m.FileName()))
 			} else {
 				for _, jsonFile := range jsonFiles {
 					jsonErr := m.metaData.JSON(jsonFile, m.BaseName())
@@ -100,7 +77,7 @@ func (m *MediaFile) MetaData() (result meta.Data) {
 
 		if err != nil {
 			m.metaData.Error = err
-			log.Debugf("metadata: %s in %s", err, sanitize.Log(m.BaseName()))
+			log.Debugf("metadata: %s in %s", err, m.BaseName())
 		}
 	})
 

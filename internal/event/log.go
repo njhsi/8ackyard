@@ -3,6 +3,7 @@ package event
 import (
 	"os"
 
+	log "github.com/dsoprea/go-logging"
 	"github.com/leandro-lugaresi/hub"
 	"github.com/sirupsen/logrus"
 )
@@ -18,15 +19,7 @@ func NewHook(hub *hub.Hub) *Hook {
 }
 
 func (h *Hook) Fire(entry *logrus.Entry) error {
-	h.hub.Publish(Message{
-		Name: "log." + entry.Level.String(),
-		Fields: Data{
-			"time":    entry.Time,
-			"level":   entry.Level.String(),
-			"message": entry.Message,
-		},
-	})
-
+	log.Errorf("Fire not implemented TODO")
 	return nil
 }
 
@@ -36,7 +29,7 @@ func (h *Hook) Levels() []logrus.Level {
 
 func init() {
 	hooks := logrus.LevelHooks{}
-	hooks.Add(NewHook(SharedHub()))
+	//	hooks.Add(NewHook(SharedHub()))
 
 	Log = &logrus.Logger{
 		Out:          os.Stderr,

@@ -2,11 +2,13 @@ package sanitize
 
 import (
 	"strings"
+
+	"github.com/njhsi/8ackyard/pkg/txt"
 )
 
 // Name sanitizes and capitalizes names.
 func Name(name string) string {
-	if name == "" {
+	if name == "" || reject(name, txt.ClipDefault) {
 		return ""
 	}
 
@@ -26,5 +28,5 @@ func Name(name string) string {
 	}
 
 	// Shorten and capitalize.
-	return name
+	return txt.Clip(txt.Title(name), txt.ClipDefault)
 }

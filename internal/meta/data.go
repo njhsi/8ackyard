@@ -4,8 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/photoprism/photoprism/pkg/rnd"
-	"github.com/photoprism/photoprism/pkg/s2"
+	"github.com/njhsi/8ackyard/pkg/rnd"
 )
 
 // Data represents image meta data.
@@ -116,9 +115,4 @@ func (data Data) ActualHeight() int {
 	}
 
 	return data.Height
-}
-
-// CellID returns the S2 cell ID.
-func (data Data) CellID() string {
-	return s2.PrefixedToken(float64(data.Lat), float64(data.Lng))
 }

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-type FileMap map[string]uint
+type FileMap map[string]int64
 
 // Files represents a list of already indexed file names and their unix modification timestamps.
 type Files struct {

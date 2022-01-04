@@ -1,11 +1,14 @@
 package backyard
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"image"
 	"io"
 	"math"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -14,15 +17,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dustin/go-humanize/english"
-
-	"github.com/disintegration/imaging"
 	"github.com/djherbis/times"
 
+	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/meta"
-
 	"github.com/njhsi/8ackyard/pkg/fs"
 	"github.com/njhsi/8ackyard/pkg/sanitize"
+	"github.com/njhsi/8ackyard/pkg/txt"
 )
 
 // MediaFile represents a single photo, video or sidecar file.
@@ -49,7 +50,7 @@ type MediaFile struct {
 func NewMediaFile(fileName string) (*MediaFile, error) {
 	m := &MediaFile{
 		fileName: fileName,
-		fileRoot: "UNKNOW"
+		fileRoot: "UNKNOW",
 		fileType: fs.FormatOther,
 		metaData: meta.NewData(),
 		width:    -1,
@@ -115,15 +116,23 @@ func (m *MediaFile) TakenAt() (time.Time, string) {
 
 	if data.Error == nil && !data.TakenAt.IsZero() && data.TakenAt.Year() > 1000 {
 		m.takenAt = data.TakenAt.UTC()
-
+		//		m.takenAtSrc = entity.SrcMeta
 
 		log.Infof("media: %s was taken at %s (%s)", filepath.Base(m.fileName), m.takenAt.String(), m.takenAtSrc)
 
 		return m.takenAt, m.takenAtSrc
 	}
 
+	if nameTime := txt.Time(m.fileName); !nameTime.IsZero() {
+		m.takenAt = nameTime
+		//		m.takenAtSrc = entity.SrcName
 
+		log.Infof("media: %s was taken at %s (%s)", filepath.Base(m.fileName), m.takenAt.String(), m.takenAtSrc)
 
+		return m.takenAt, m.takenAtSrc
+	}
+
+	//	m.takenAtSrc = entity.SrcAuto
 
 	fileInfo, err := times.Stat(m.FileName())
 
@@ -328,13 +337,6 @@ func (m *MediaFile) RelatedFiles(stripSequence bool) (result RelatedFiles, err e
 	}
 
 	// Add hidden JPEG if exists.
-	if !result.ContainsJpeg() {
-		if jpegName := fs.FormatJpeg.FindFirst(result.Main.FileName(), []string{Config().SidecarPath(), fs.HiddenPath}, Config().OriginalsPath(), stripSequence); jpegName != "" {
-			if resultFile, err := NewMediaFile(jpegName); err == nil {
-				result.Files = append(result.Files, resultFile)
-			}
-		}
-	}
 
 	sort.Sort(result.Files)
 
@@ -347,9 +349,11 @@ func (m *MediaFile) PathNameInfo(stripSequence bool) (fileRoot, fileBase, relati
 
 	var rootPath string
 
+	switch fileRoot {
 
-	rootPath = Config().OriginalsPath()
-	
+	default:
+		rootPath = config.OriginalsPath()
+	}
 
 	fileBase = m.BasePrefix(stripSequence)
 	relativePath = m.RelPath(rootPath)
@@ -371,7 +375,8 @@ func (m *MediaFile) BaseName() string {
 // SetFileName sets the filename to the given string.
 func (m *MediaFile) SetFileName(fileName string) {
 	m.fileName = fileName
-	m.fileRoot = "UNKNOW"
+	//	m.fileRoot = entity.RootUnknown
+	m.fileRoot = "UNKNOWN" //TODO
 }
 
 // RootRelName returns the relative filename, and automatically detects the root path.
@@ -417,9 +422,11 @@ func (m *MediaFile) RelPath(directory string) string {
 
 // RootPath returns the file root path based on the configuration.
 func (m *MediaFile) RootPath() string {
+	switch m.Root() {
 
-	return Config().OriginalsPath()
-
+	default:
+		return config.OriginalsPath()
+	}
 }
 
 // RootRelPath returns the relative path and automatically detects the root path.
@@ -453,8 +460,18 @@ func (m *MediaFile) BasePrefix(stripSequence bool) string {
 
 // Root returns the file root directory.
 func (m *MediaFile) Root() string {
+	if m.fileRoot != "UNKNOWN" {
 		return m.fileRoot
+	}
 
+	if strings.HasPrefix(m.FileName(), config.OriginalsPath()) {
+		m.fileRoot = config.OriginalsPath()
+		return m.fileRoot
+	}
+
+	//	importPath := config.ImportPath()
+
+	return m.fileRoot
 }
 
 // AbsPrefix returns the directory and base filename without any extensions.
@@ -700,7 +717,8 @@ func (m *MediaFile) Jpeg() (*MediaFile, error) {
 		return m, nil
 	}
 
-	jpegFilename := fs.FormatJpeg.FindFirst(m.FileName(), []string{Config().SidecarPath(), fs.HiddenPath}, Config().OriginalsPath(), false)
+	//	jpegFilename := fs.FormatJpeg.FindFirst(m.FileName(), []string{Config().SidecarPath(), fs.HiddenPath}, Config().OriginalsPath(), false)
+	jpegFilename := ""
 
 	if jpegFilename == "" {
 		return nil, fmt.Errorf("no jpeg found for %s", m.FileName())
@@ -720,7 +738,8 @@ func (m *MediaFile) HasJpeg() bool {
 		return true
 	}
 
-	jpegName := fs.FormatJpeg.FindFirst(m.FileName(), []string{Config().SidecarPath(), fs.HiddenPath}, Config().OriginalsPath(), false)
+	//	jpegName := fs.FormatJpeg.FindFirst(m.FileName(), []string{Config().SidecarPath(), fs.HiddenPath}, Config().OriginalsPath(), false)
+	jpegName := ""
 
 	if jpegName == "" {
 		m.hasJpeg = false
@@ -833,3 +852,49 @@ func (m *MediaFile) Orientation() int {
 	return 1
 }
 
+// ToJson uses exiftool to export metadata to a json file.
+func (m *MediaFile) ToJson() (jsonName string, err error) {
+
+	jsonName, err = m.ExifToolJsonName()
+
+	if err != nil {
+		return "", nil
+	}
+
+	if fs.FileExists(jsonName) {
+		return jsonName, nil
+	}
+
+	relName := m.RelName(config.OriginalsPath())
+
+	log.Debugf("exiftool: extracting metadata from %s", relName)
+
+	cmd := exec.Command("exiftool", "-n", "-m", "-api", "LargeFileSupport", "-j", m.FileName())
+
+	// Fetch command output.
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	// Run convert command.
+	if err := cmd.Run(); err != nil {
+		if stderr.String() != "" {
+			return "", errors.New(stderr.String())
+		} else {
+			return "", err
+		}
+	}
+
+	// Write output to file.
+	if err := os.WriteFile(jsonName, []byte(out.String()), os.ModePerm); err != nil {
+		return "", err
+	}
+
+	// Check if file exists.
+	if !fs.FileExists(jsonName) {
+		return "", fmt.Errorf("exiftool: failed creating %s", filepath.Base(jsonName))
+	}
+
+	return jsonName, err
+}

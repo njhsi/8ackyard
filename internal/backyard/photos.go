@@ -1,11 +1,7 @@
 package backyard
 
 import (
-	"fmt"
 	"sync"
-	"time"
-
-	"github.com/njhsi/8ackyard/internal/entity"
 )
 
 type PhotoMap map[string]uint
@@ -36,33 +32,10 @@ func (m *Photos) Init() error {
 		return nil
 	}
 
-	photos, err := query.IndexedPhotos()
+	photos := make(PhotoMap)
 
-	if err != nil {
-		return fmt.Errorf("%s (find indexed photos)", err.Error())
-	} else {
-		m.photos = photos
-		m.count = len(photos)
-		return nil
-	}
-}
+	m.photos = photos
+	m.count = len(photos)
+	return nil
 
-// Remove a photo from the lookup table.
-func (m *Photos) Remove(takenAt time.Time, cellId string) {
-	key := entity.MapKey(takenAt, cellId)
-
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	delete(m.photos, key)
-}
-
-// Find returns the photo ID for a time and cell id.
-func (m *Photos) Find(takenAt time.Time, cellId string) uint {
-	key := entity.MapKey(takenAt, cellId)
-
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	return m.photos[key]
 }

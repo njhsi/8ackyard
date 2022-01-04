@@ -11,8 +11,8 @@ import (
 	jpegstructure "github.com/dsoprea/go-jpeg-image-structure/v2"
 	pngstructure "github.com/dsoprea/go-png-image-structure/v2"
 	tiffstructure "github.com/dsoprea/go-tiff-image-structure/v2"
-	"github.com/photoprism/photoprism/pkg/fs"
-	"github.com/photoprism/photoprism/pkg/sanitize"
+	"github.com/njhsi/8ackyard/pkg/fs"
+	"github.com/njhsi/8ackyard/pkg/sanitize"
 )
 
 func RawExif(fileName string, fileType fs.FileFormat) (rawExif []byte, err error) {

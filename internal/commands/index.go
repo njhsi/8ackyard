@@ -14,7 +14,6 @@ import (
 	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/service"
 	"github.com/njhsi/8ackyard/pkg/fs"
-	"github.com/njhsi/8ackyard/pkg/sanitize"
 )
 
 // IndexCommand registers the index cli command.
@@ -41,27 +40,16 @@ var indexFlags = []cli.Flag{
 func indexAction(ctx *cli.Context) error {
 	start := time.Now()
 
-	conf := config.NewConfig(ctx)
-	service.SetConfig(conf)
-
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	if err := conf.Init(); err != nil {
-		return err
-	}
 
 	// Use first argument to limit scope if set.
 	subPath := strings.TrimSpace(ctx.Args().First())
 
 	if subPath == "" {
-		log.Infof("indexing originals in %s", sanitize.Log(conf.OriginalsPath()))
+		log.Infof("indexing originals in %s", config.OriginalsPath())
 	} else {
-		log.Infof("indexing originals in %s", sanitize.Log(filepath.Join(conf.OriginalsPath(), subPath)))
-	}
-
-	if conf.ReadOnly() {
-		log.Infof("config: read-only mode enabled")
+		log.Infof("indexing originals in %s", filepath.Join(config.OriginalsPath(), subPath))
 	}
 
 	var indexed fs.Done
@@ -80,8 +68,6 @@ func indexAction(ctx *cli.Context) error {
 	elapsed := time.Since(start)
 
 	log.Infof("indexed %s in %s", english.Plural(len(indexed), "file", "files"), elapsed)
-
-	conf.Shutdown()
 
 	return nil
 }

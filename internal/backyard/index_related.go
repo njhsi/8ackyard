@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/photoprism/photoprism/pkg/sanitize"
+	"github.com/njhsi/8ackyard/internal/config"
+	"github.com/njhsi/8ackyard/pkg/sanitize"
 )
 
 // IndexMain indexes the main file from a group of related files and returns the result.
@@ -17,7 +18,7 @@ func IndexMain(related *RelatedFiles, ind *Index, opt IndexOptions) (result Inde
 	}
 
 	f := related.Main
-	sizeLimit := ind.conf.OriginalsLimit()
+	sizeLimit := config.OriginalsLimit()
 
 	// Enforce file size limit for originals.
 	if sizeLimit > 0 && f.FileSize() > sizeLimit {
@@ -27,40 +28,15 @@ func IndexMain(related *RelatedFiles, ind *Index, opt IndexOptions) (result Inde
 	}
 
 	if f.NeedsExifToolJson() {
-		if jsonName, err := ind.convert.ToJson(f); err != nil {
+		if jsonName, err := f.ToJson(); err != nil {
 			log.Debugf("index: %s in %s (extract metadata)", sanitize.Log(err.Error()), sanitize.Log(f.BaseName()))
 		} else {
 			log.Debugf("index: created %s", filepath.Base(jsonName))
 		}
 	}
 
-	if opt.Convert && f.IsMedia() && !f.HasJpeg() {
-		if jpegFile, err := ind.convert.ToJpeg(f); err != nil {
-			result.Err = fmt.Errorf("index: failed converting %s to jpeg (%s)", sanitize.Log(f.BaseName()), err.Error())
-			result.Status = IndexFailed
-
-			return result
-		} else {
-			log.Debugf("index: created %s", sanitize.Log(jpegFile.BaseName()))
-
-			if err := jpegFile.ResampleDefault(ind.thumbPath(), false); err != nil {
-				result.Err = fmt.Errorf("index: failed creating thumbnails for %s (%s)", sanitize.Log(f.BaseName()), err.Error())
-				result.Status = IndexFailed
-
-				return result
-			}
-
-			related.Files = append(related.Files, jpegFile)
-		}
-	}
-
-	result = ind.MediaFile(f, opt, "")
-
-	if result.Indexed() && f.IsJpeg() {
-		if err := f.ResampleDefault(ind.thumbPath(), false); err != nil {
-			log.Errorf("index: failed creating thumbnails for %s (%s)", sanitize.Log(f.BaseName()), err.Error())
-		}
-	}
+	//	result = ind.MediaFile(f, opt, "")
+	result.Status = IndexAdded
 
 	log.Infof("index: %s main %s file %s", result, f.FileType(), sanitize.Log(f.RelName(ind.originalsPath())))
 
@@ -70,7 +46,7 @@ func IndexMain(related *RelatedFiles, ind *Index, opt IndexOptions) (result Inde
 // IndexMain indexes a group of related files and returns the result.
 func IndexRelated(related RelatedFiles, ind *Index, opt IndexOptions) (result IndexResult) {
 	done := make(map[string]bool)
-	sizeLimit := ind.conf.OriginalsLimit()
+	sizeLimit := config.OriginalsLimit()
 
 	result = IndexMain(&related, ind, opt)
 
@@ -107,40 +83,15 @@ func IndexRelated(related RelatedFiles, ind *Index, opt IndexOptions) (result In
 		}
 
 		if f.NeedsExifToolJson() {
-			if jsonName, err := ind.convert.ToJson(f); err != nil {
+			if jsonName, err := f.ToJson(); err != nil {
 				log.Debugf("index: %s in %s (extract metadata)", sanitize.Log(err.Error()), sanitize.Log(f.BaseName()))
 			} else {
 				log.Debugf("index: created %s", filepath.Base(jsonName))
 			}
 		}
 
-		if opt.Convert && f.IsMedia() && !f.HasJpeg() {
-			if jpegFile, err := ind.convert.ToJpeg(f); err != nil {
-				result.Err = fmt.Errorf("index: failed converting %s to jpeg (%s)", sanitize.Log(f.BaseName()), err.Error())
-				result.Status = IndexFailed
-
-				return result
-			} else {
-				log.Debugf("index: created %s", sanitize.Log(jpegFile.BaseName()))
-
-				if err := jpegFile.ResampleDefault(ind.thumbPath(), false); err != nil {
-					result.Err = fmt.Errorf("index: failed creating thumbnails for %s (%s)", sanitize.Log(f.BaseName()), err.Error())
-					result.Status = IndexFailed
-
-					return result
-				}
-
-				related.Files = append(related.Files, jpegFile)
-			}
-		}
-
-		res := ind.MediaFile(f, opt, "")
-
-		if res.Indexed() && f.IsJpeg() {
-			if err := f.ResampleDefault(ind.thumbPath(), false); err != nil {
-				log.Errorf("index: failed creating thumbnails for %s (%s)", sanitize.Log(f.BaseName()), err.Error())
-			}
-		}
+		//		res := ind.MediaFile(f, opt, "")
+		res := result
 
 		log.Infof("index: %s related %s file %s", res, f.FileType(), sanitize.Log(f.BaseName()))
 	}

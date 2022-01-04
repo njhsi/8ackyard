@@ -2,7 +2,6 @@ package backyard
 
 import (
 	"errors"
-	"fmt"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
@@ -12,30 +11,21 @@ import (
 	"github.com/karrick/godirwalk"
 
 	"github.com/njhsi/8ackyard/internal/config"
-	"github.com/njhsi/8ackyard/internal/event"
 	"github.com/njhsi/8ackyard/internal/mutex"
 	"github.com/njhsi/8ackyard/pkg/fs"
-	"github.com/njhsi/8ackyard/pkg/sanitize"
 )
 
 // Index represents an indexer that indexes files in the originals directory.
 type Index struct {
-	conf *config.Config
 	//	convert *Convert
 	files  *Files
 	photos *Photos
 }
 
 // NewIndex returns a new indexer and expects its dependencies as arguments.
-func NewIndex(conf *config.Config, files *Files, photos *Photos) *Index {
-	if conf == nil {
-		log.Errorf("index: config is nil")
-		return nil
-	}
+func NewIndex(files *Files, photos *Photos) *Index {
 
 	i := &Index{
-		conf: conf,
-		//		convert: convert,
 		files:  files,
 		photos: photos,
 	}
@@ -44,7 +34,7 @@ func NewIndex(conf *config.Config, files *Files, photos *Photos) *Index {
 }
 
 func (ind *Index) originalsPath() string {
-	return ind.conf.OriginalsPath()
+	return config.OriginalsPath()
 }
 
 // Cancel stops the current indexing operation.
@@ -62,21 +52,16 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	done := make(fs.Done)
 
-	if ind.conf == nil {
-		log.Errorf("index: config is nil")
-		return done
-	}
-
 	originalsPath := ind.originalsPath()
 	optionsPath := filepath.Join(originalsPath, opt.Path)
 
 	if !fs.PathExists(optionsPath) {
-		event.Error(fmt.Sprintf("index: %s does not exist", sanitize.Log(optionsPath)))
+		log.Errorf("index: %s does not exist", optionsPath)
 		return done
 	}
 
 	if err := mutex.MainWorker.Start(); err != nil {
-		event.Error(fmt.Sprintf("index: %s", err.Error()))
+		log.Errorf("index: %s", err.Error())
 		return done
 	}
 
@@ -86,7 +71,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	// Start a fixed number of goroutines to index files.
 	var wg sync.WaitGroup
-	var numWorkers = ind.conf.Workers()
+	var numWorkers = 5
 	wg.Add(numWorkers)
 	for i := 0; i < numWorkers; i++ {
 		go func() {
@@ -131,14 +116,12 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 					//	folder := entity.NewFolder(entity.RootOriginals, relName, fs.BirthTime(fileName))
 
 					//	if err := folder.Create(); err == nil {
-					log.Infof("index: added folder /%s", folder.Path)
+					log.Infof("index: added folder /%s", fileName)
 					//					}
 				}
 
 				if isDir {
-					event.Publish("index.folder", event.Data{
-						"filePath": relName,
-					})
+					log.Infof("index.folder filePath /%s", relName)
 				}
 
 				return result
@@ -159,7 +142,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			}
 
 			if mf.FileSize() == 0 {
-				log.Infof("index: skipped empty file %s", sanitize.Log(mf.BaseName()))
+				log.Infof("index: skipped empty file %s", mf.BaseName())
 				return nil
 			}
 
@@ -222,18 +205,10 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	}
 
 	if filesIndexed > 0 {
-		event.Publish("index.updating", event.Data{
-			"step": "faces",
-		})
 
-		event.Publish("index.updating", event.Data{
-			"step": "counts",
-		})
+		log.Infof("index.updating /%d", filesIndexed)
 
 		// Update precalculated photo and file counts.
-		if err := entity.UpdateCounts(); err != nil {
-			log.Warnf("index: %s (update counts)", err)
-		}
 	} else {
 		log.Infof("index: found no new or modified files")
 	}

@@ -12,9 +12,9 @@ import (
 
 	"github.com/dsoprea/go-exif/v3"
 	exifcommon "github.com/dsoprea/go-exif/v3/common"
-	"github.com/photoprism/photoprism/pkg/fs"
-	"github.com/photoprism/photoprism/pkg/rnd"
-	"github.com/photoprism/photoprism/pkg/sanitize"
+	"github.com/njhsi/8ackyard/pkg/fs"
+	"github.com/njhsi/8ackyard/pkg/rnd"
+	"github.com/njhsi/8ackyard/pkg/sanitize"
 	"gopkg.in/photoprism/go-tz.v2/tz"
 )
 
@@ -270,18 +270,18 @@ func (data *Data) Exif(fileName string, fileType fs.FileFormat) (err error) {
 
 	if value, ok := tags["Flash"]; ok {
 		if i, err := strconv.Atoi(value); err == nil && i&1 == 1 {
-			data.AddKeywords(KeywordFlash)
+			//			data.AddKeywords(KeywordFlash)
 			data.Flash = true
 		}
 	}
 
 	if value, ok := tags["ImageDescription"]; ok {
-		data.AutoAddKeywords(value)
+		//		data.AutoAddKeywords(value)
 		data.Description = SanitizeDescription(value)
 	}
 
 	if value, ok := tags["ProjectionType"]; ok {
-		data.AddKeywords(KeywordPanorama)
+		//		data.AddKeywords(KeywordPanorama)
 		data.Projection = SanitizeString(value)
 	}
 
