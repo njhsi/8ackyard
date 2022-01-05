@@ -75,6 +75,7 @@ func backup_main(mFiles MediaFiles, ind *Index, opt IndexOptions) (result IndexR
 	sumMfiles := map[string]MediaFiles{}
 	if len(mFiles) == 1 { // no need to do hash
 		sumMfiles[""] = mFiles
+		log.Infof("backup: mf=%s size=%d  sha1=%s", mFiles[0].FileName(), mFiles[0].FileSize(), mFiles[0].Hash())
 	} else {
 		for _, mf := range mFiles[1:] {
 			sumMfiles[mf.Hash()] = append(sumMfiles[mf.Hash()], mf)
