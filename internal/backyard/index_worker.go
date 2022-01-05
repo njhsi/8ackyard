@@ -53,9 +53,12 @@ func index_main(fileName string, ind *Index, opt IndexOptions, exifTool *exiftoo
 			jsonName, err1 := f.ExifToolJsonName()
 			jsonFile, err2 := json.Marshal(fileInfo.Fields)
 			if err1 == nil && err2 == nil {
-				log.Infof("index: exifTool.ExtractMetadata on %s %s, -> %s", fileInfo.File, f.Hash(), jsonName)
 				ioutil.WriteFile(jsonName, jsonFile, 0644)
+			} else {
+				log.Errorf("index: exifTool on %s %s,%s,%s|%s", fileInfo.File, f.Hash(), jsonName, err1, err2)
+
 			}
+
 		}
 	}
 

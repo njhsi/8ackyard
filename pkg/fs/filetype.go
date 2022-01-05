@@ -47,6 +47,7 @@ const (
 	FormatMp3      FileFormat = "mp3"
 	FormatM4a      FileFormat = "m4a"
 	FormatWav      FileFormat = "wav"
+	FormatAmr      FileFormat = "amr"
 	FormatOther    FileFormat = "" // Unknown file format.
 )
 

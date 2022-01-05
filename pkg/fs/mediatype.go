@@ -45,6 +45,7 @@ var MediaTypes = map[FileFormat]MediaType{
 	FormatMp3:      MediaAudio,
 	FormatM4a:      MediaAudio,
 	FormatWav:      MediaAudio,
+	FormatAmr:      MediaAudio,
 	FormatOther:    MediaOther,
 }
 
