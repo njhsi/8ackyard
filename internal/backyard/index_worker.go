@@ -126,7 +126,16 @@ func backup_main(mFiles MediaFiles, ind *Index, opt IndexOptions) (result IndexR
 			loc, _ := time.LoadLocation("Asia/Chongqing")
 			takenAt, src := mfBest.TakenAt()
 			takenAt = takenAt.In(loc)
-			backupTo := opt.BackupPath + "/" + takenAt.Format("2006/01/02") + "/" + mfBest.BaseName()
+			mType := "unknown"
+			if mfBest.IsPhoto() {
+				mType = "photo"
+			} else if mfBest.IsVideo() {
+				mType = "video"
+			} else if mfBest.IsAudio() {
+				mType = "audio"
+			}
+
+			backupTo := opt.BackupPath + "/" + mType + "/" + takenAt.Format("2006/01/02") + "/" + mfBest.BaseName()
 			for fs.FileExists(backupTo) {
 				backupTo = backupTo + "_8"
 			}

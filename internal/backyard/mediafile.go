@@ -570,6 +570,10 @@ func (m *MediaFile) IsVideo() bool {
 	return strings.HasPrefix(m.MimeType(), "video/") || m.MediaType() == fs.MediaVideo
 }
 
+func (m *MediaFile) IsAudio() bool {
+	return strings.HasPrefix(m.MimeType(), "audio/") || m.MediaType() == fs.MediaAudio
+}
+
 // IsJson return true if this media file is a json sidecar file.
 func (m *MediaFile) IsJson() bool {
 	return m.HasFileType(fs.FormatJson)
@@ -649,7 +653,7 @@ func (m *MediaFile) ExifSupported() bool {
 
 // IsMedia returns true if this is a media file (photo or video, not sidecar or other).
 func (m *MediaFile) IsMedia() bool {
-	return m.IsJpeg() || m.IsVideo() || m.IsRaw() || m.IsHEIF() || m.IsImageOther()
+	return m.IsJpeg() || m.IsVideo() || m.IsRaw() || m.IsHEIF() || m.IsImageOther() || m.IsAudio()
 }
 
 // Jpeg returns a the JPEG version of the media file (if exists).
