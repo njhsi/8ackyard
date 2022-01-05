@@ -1,11 +1,15 @@
 package backyard
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"time"
 
+	"github.com/barasher/go-exiftool"
 	"github.com/njhsi/8ackyard/internal/config"
+	"github.com/njhsi/8ackyard/pkg/fs"
 	"github.com/njhsi/8ackyard/pkg/sanitize"
 )
 
@@ -15,14 +19,14 @@ type IndexJob struct {
 	Ind      *Index
 }
 
-func IndexWorker(jobs <-chan IndexJob) {
+func IndexWorker(jobs <-chan IndexJob, et *exiftool.Exiftool) {
 	for job := range jobs {
 		log.Infof("IndexWorker:                           fileName=%s", job.FileName)
-		index_main(job.FileName, job.Ind, job.IndexOpt)
+		index_main(job.FileName, job.Ind, job.IndexOpt, et)
 	}
 }
 
-func index_main(fileName string, ind *Index, opt IndexOptions) (result IndexResult) {
+func index_main(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool.Exiftool) (result IndexResult) {
 	f, err := NewMediaFile(fileName)
 	if err != nil {
 		result.Err = fmt.Errorf("index: found no  mediafile for %s", sanitize.Log(fileName))
@@ -39,11 +43,27 @@ func index_main(fileName string, ind *Index, opt IndexOptions) (result IndexResu
 		return result
 	}
 
+	if exifTool != nil && f.NeedsExifToolJson() {
+		fileInfos := exifTool.ExtractMetadata(fileName)
+		for _, fileInfo := range fileInfos {
+			if fileInfo.Err != nil {
+				log.Errorf("index: Error in exiftool %v: %v\n", fileInfo.File, fileInfo.Err)
+				continue
+			}
+			jsonName, err1 := f.ExifToolJsonName()
+			jsonFile, err2 := json.Marshal(fileInfo.Fields)
+			if err1 == nil && err2 == nil {
+				log.Infof("index: exifTool.ExtractMetadata on %s %s, -> %s", fileInfo.File, f.Hash(), jsonName)
+				ioutil.WriteFile(jsonName, jsonFile, 0644)
+			}
+		}
+	}
+
 	if f.NeedsExifToolJson() {
 		if jsonName, err := f.ToJson(); err != nil {
 			log.Debugf("index: %s in %s (extract metadata)", sanitize.Log(err.Error()), sanitize.Log(f.BaseName()))
 		} else {
-			log.Debugf("index: created %s", filepath.Base(jsonName))
+			log.Debugf("index: created %s (extract metadata)", filepath.Base(jsonName))
 			f.ReadExifToolJson()
 		}
 	}
@@ -106,9 +126,12 @@ func backup_main(mFiles MediaFiles, ind *Index, opt IndexOptions) (result IndexR
 			loc, _ := time.LoadLocation("Asia/Chongqing")
 			takenAt, src := mfBest.TakenAt()
 			takenAt = takenAt.In(loc)
-			backupTo := opt.BackupPath + "/" + takenAt.Format("2006/01/02") + "/"
+			backupTo := opt.BackupPath + "/" + takenAt.Format("2006/01/02") + "/" + mfBest.BaseName()
+			for fs.FileExists(backupTo) {
+				backupTo = backupTo + "_8"
+			}
 			log.Infof("backup: DO!!! [ %s => %s ], %s %s", mfBest.FileName(), backupTo, takenAt, src)
-			mfBest.Copy(backupTo + mfBest.BaseName())
+			mfBest.Copy(backupTo)
 		}
 	}
 

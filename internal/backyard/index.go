@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/barasher/go-exiftool"
 	"github.com/karrick/godirwalk"
 
 	"github.com/njhsi/8ackyard/internal/config"
@@ -78,7 +79,14 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	wg.Add(numWorkers)
 	for i := 0; i < numWorkers; i++ {
 		go func() {
-			IndexWorker(jobs) // HLc
+			et, err := exiftool.NewExiftool()
+			if err != nil {
+				et = nil
+				log.Warnf("index: error when intializing exiftool: %v\n", err)
+			} else {
+				defer et.Close()
+			}
+			IndexWorker(jobs, et) // HLc
 			wg.Done()
 		}()
 
