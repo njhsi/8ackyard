@@ -73,15 +73,19 @@ func BackupWorker(jobs <-chan BackupJob) {
 
 func backup_main(mFiles MediaFiles, ind *Index, opt IndexOptions) (result IndexResult) {
 	sumMfiles := map[string]MediaFiles{}
-	for _, mf := range mFiles {
-		sumMfiles[mf.Md5sum()] = append(sumMfiles[mf.Md5sum()], mf)
+	if len(mFiles) == 1 { // no need to do hash
+		sumMfiles[""] = mFiles
+	} else {
+		for _, mf := range mFiles[1:] {
+			sumMfiles[mf.Hash()] = append(sumMfiles[mf.Hash()], mf)
+			log.Infof("backup: mf=%s size=%d  sha1=%s", mf.FileName(), mf.FileSize(), mf.Hash())
+		}
 	}
-	for _, mfs := range sumMfiles { //TODO: job the vMfiles of each md5sum
+	for _, mfs := range sumMfiles { //TODO: job the vMfiles of each Hash
 		var mfBest *MediaFile = nil
 		for _, mf := range mfs {
 			//TODO: save dups info into a txt file, in case ..
 			takenAt, src := mf.TakenAt()
-			log.Infof("backup: mf=%s md5=%s takenat=%s src=%s", mf.FileName(), mf.Md5sum(), takenAt, src)
 			if src == "meta" {
 				mfBest = mf
 				break
@@ -101,9 +105,9 @@ func backup_main(mFiles MediaFiles, ind *Index, opt IndexOptions) (result IndexR
 			loc, _ := time.LoadLocation("Asia/Chongqing")
 			takenAt, src := mfBest.TakenAt()
 			takenAt = takenAt.In(loc)
-			folder := takenAt.Format("2006/01/02")
-			log.Infof("backup: DO!! [ %s => %s ], %s %s", mfBest.FileName(), folder, takenAt, src)
-			mfBest.Copy("/tmp/Backup/" + folder + "/" + mfBest.BaseName())
+			backupTo := opt.BackupPath + "/" + takenAt.Format("2006/01/02") + "/"
+			log.Infof("backup: DO!!! [ %s => %s ], %s %s", mfBest.FileName(), backupTo, takenAt, src)
+			mfBest.Copy(backupTo + mfBest.BaseName())
 		}
 	}
 

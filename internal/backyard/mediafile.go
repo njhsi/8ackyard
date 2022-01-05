@@ -144,7 +144,7 @@ func (m *MediaFile) TakenAt() (time.Time, string) {
 		return m.takenAt, m.takenAtSrc
 	}
 
-	if fileInfo.HasBirthTime() {
+	if fileInfo.HasBirthTime() && fileInfo.BirthTime().Before(fileInfo.ModTime()) {
 		m.takenAt = fileInfo.BirthTime().UTC()
 		log.Infof("media: %s was taken at %s (file birth time)", filepath.Base(m.fileName), m.takenAt.String())
 	} else {
@@ -509,12 +509,18 @@ func (m *MediaFile) Copy(dest string) error {
 
 	defer destFile.Close()
 
-	_, err = io.Copy(destFile, thisFile)
+	if _, err = io.Copy(destFile, thisFile); err != nil {
+		log.Error(err.Error())
+		return err
+	}
 
+	si, err := os.Lstat(m.fileName)
 	if err != nil {
 		log.Error(err.Error())
 		return err
 	}
+	err = os.Chmod(dest, si.Mode())
+	err = os.Chtimes(dest, si.ModTime(), si.ModTime())
 
 	return nil
 }

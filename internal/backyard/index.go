@@ -71,7 +71,10 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	// Start a fixed number of goroutines to index files.
 	var wg sync.WaitGroup
-	var numWorkers = 8
+	var numWorkers = opt.NumWorkers
+	if numWorkers == 0 {
+		numWorkers = 4
+	}
 	wg.Add(numWorkers)
 	for i := 0; i < numWorkers; i++ {
 		go func() {
@@ -181,25 +184,27 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	runtime.GC()
 
 	// BACKUP to destine
-	jobs2 := make(chan BackupJob)
-	wg.Add(numWorkers)
-	for i := 0; i < numWorkers; i++ {
-		go func() {
-			BackupWorker(jobs2)
-			wg.Done()
-		}()
-	}
-	for kFileSize, vMfiles := range ind.files.mfiles {
-		log.Infof("backup: size=%d, %d mfs", kFileSize, len(vMfiles))
-		jobs2 <- BackupJob{
-			IndexOpt: opt,
-			Ind:      ind,
-			MFiles:   vMfiles,
+	if opt.BackupPath != "" {
+		jobs2 := make(chan BackupJob)
+		wg.Add(numWorkers)
+		for i := 0; i < numWorkers; i++ {
+			go func() {
+				BackupWorker(jobs2)
+				wg.Done()
+			}()
 		}
+		for kFileSize, vMfiles := range ind.files.mfiles {
+			log.Infof("backup: size=%d, %d mfs", kFileSize, len(vMfiles))
+			jobs2 <- BackupJob{
+				IndexOpt: opt,
+				Ind:      ind,
+				MFiles:   vMfiles,
+			}
+		}
+		close(jobs2)
+		wg.Wait()
+		runtime.GC()
 	}
-	close(jobs2)
-	wg.Wait()
-	runtime.GC()
 
 	return done
 }

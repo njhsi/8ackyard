@@ -44,7 +44,10 @@ const (
 	FormatJson     FileFormat = "json" // JSON metadata / config / sidecar file.
 	FormatText     FileFormat = "txt"  // Text config / sidecar file.
 	FormatMarkdown FileFormat = "md"   // Markdown text sidecar file.
-	FormatOther    FileFormat = ""     // Unknown file format.
+	FormatMp3      FileFormat = "mp3"
+	FormatM4a      FileFormat = "m4a"
+	FormatWav      FileFormat = "wav"
+	FormatOther    FileFormat = "" // Unknown file format.
 )
 
 // FileExt contains the filename extensions of file formats known to
@@ -131,6 +134,9 @@ var FileExt = FileExtensions{
 	".txt":  FormatText,
 	".md":   FormatMarkdown,
 	".json": FormatJson,
+	".mp3":  FormatMp3,
+	".m4a":  FormatM4a,
+	".wav":  FormatWav,
 }
 
 func (m FileExtensions) Known(name string) bool {

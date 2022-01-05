@@ -7,6 +7,7 @@ const (
 	MediaSidecar MediaType = "sidecar"
 	MediaRaw     MediaType = "raw"
 	MediaVideo   MediaType = "video"
+	MediaAudio   MediaType = "audio"
 	MediaOther   MediaType = "other"
 )
 
@@ -41,6 +42,9 @@ var MediaTypes = map[FileFormat]MediaType{
 	FormatJson:     MediaSidecar,
 	FormatToml:     MediaSidecar,
 	FormatMarkdown: MediaSidecar,
+	FormatMp3:      MediaAudio,
+	FormatM4a:      MediaAudio,
+	FormatWav:      MediaAudio,
 	FormatOther:    MediaOther,
 }
 
@@ -60,7 +64,7 @@ func GetMediaType(fileName string) MediaType {
 
 func IsMedia(fileName string) bool {
 	switch GetMediaType(fileName) {
-	case MediaRaw, MediaImage, MediaVideo:
+	case MediaRaw, MediaImage, MediaVideo, MediaAudio:
 		return true
 	default:
 		return false

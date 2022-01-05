@@ -34,6 +34,16 @@ var indexFlags = []cli.Flag{
 		Name:  "cleanup, c",
 		Usage: "remove orphan index entries and thumbnails",
 	},
+	cli.StringFlag{
+		Name:  "backup, b",
+		Usage: "backup to where, after indexing",
+		Value: "",
+	},
+	cli.IntFlag{
+		Name:  "workers, n",
+		Usage: "number of workers",
+		Value: 4,
+	},
 }
 
 // indexAction indexes all photos in originals directory (photo library)
@@ -43,23 +53,29 @@ func indexAction(ctx *cli.Context) error {
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	backupPath := ctx.String("backup")
+	numWorkers := ctx.Int("workers")
+
 	// Use first argument to limit scope if set.
 	subPath := strings.TrimSpace(ctx.Args().First())
 
 	if subPath == "" {
-		log.Infof("indexing originals in %s", config.OriginalsPath())
+		log.Errorf("indexing not going as subpath is not provided, but it's a must for originals=%s", config.OriginalsPath())
+		return nil
 	} else {
-		log.Infof("indexing originals in %s", filepath.Join(config.OriginalsPath(), subPath))
+		log.Infof("indexing originals= %s, backup=%s, n=%d", filepath.Join(config.OriginalsPath(), subPath), backupPath, numWorkers)
 	}
 
 	var indexed fs.Done
 
 	if w := service.Index(); w != nil {
 		opt := backyard.IndexOptions{
-			Path:    subPath,
-			Rescan:  true,
-			Convert: false,
-			Stack:   true,
+			Path:       subPath,
+			BackupPath: backupPath,
+			NumWorkers: numWorkers,
+			Rescan:     true,
+			Convert:    false,
+			Stack:      true,
 		}
 
 		indexed = w.Start(opt)

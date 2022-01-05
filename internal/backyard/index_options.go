@@ -1,11 +1,13 @@
 package backyard
 
 type IndexOptions struct {
-	Path      string
-	Rescan    bool
-	Convert   bool
-	Stack     bool
-	FacesOnly bool
+	Path       string
+	BackupPath string
+	NumWorkers int
+	Rescan     bool
+	Convert    bool
+	Stack      bool
+	FacesOnly  bool
 }
 
 func (o *IndexOptions) SkipUnchanged() bool {

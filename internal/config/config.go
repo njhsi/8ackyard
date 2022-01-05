@@ -1,7 +1,7 @@
 package config
 
 func OriginalsPath() string {
-	return "/tmp/Originals"
+	return "/"
 }
 
 func CachePath() string {
