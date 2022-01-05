@@ -14,6 +14,8 @@ var YearRegexp = regexp.MustCompile("\\d{4,5}")
 var IsDateRegexp = regexp.MustCompile("\\d{4}[\\-_]?\\d{2}[\\-_]?\\d{2}")
 var IsDateTimeRegexp = regexp.MustCompile("\\d{4}[\\-_]?\\d{2}[\\-_]?\\d{2}.{1,4}\\d{2}\\D?\\d{2}\\D?\\d{2}")
 
+var DateRegexp2 = regexp.MustCompile("(202[0-9]|201[0-9]|200[0-9]|[0-1][0-9]{3})(1[0-2]|0[1-9])(3[01]|[0-2][1-9]|[12]0)")
+
 var (
 	YearMin = 1990
 	YearMax = time.Now().Year() + 3
@@ -141,6 +143,25 @@ func Time(s string) (result time.Time) {
 				0,
 				time.UTC)
 		}
+	} else if found := DateRegexp2.Find(b); len(found) == 8 { // Is it a date like "20200103"?
+		year := Int(string(found[0:4]))
+		month := Int(string(found[4:6]))
+		day := Int(string(found[6:8]))
+
+		if year < YearMin || year > YearMax || month < MonthMin || month > MonthMax || day < DayMin || day > DayMax {
+			return result
+		}
+
+		result = time.Date(
+			year,
+			time.Month(month),
+			day,
+			0,
+			0,
+			0,
+			0,
+			time.UTC)
+
 	}
 
 	return result.UTC()

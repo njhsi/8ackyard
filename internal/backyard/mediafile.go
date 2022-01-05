@@ -109,47 +109,42 @@ func (m *MediaFile) TakenAt() (time.Time, string) {
 		return m.takenAt, m.takenAtSrc
 	}
 
-	m.takenAt = time.Now().UTC()
+	m.takenAt, m.takenAtSrc = time.Now().UTC(), "auto"
+	tAuto, tName := m.takenAt, m.takenAt
 
 	data := m.MetaData()
-
 	if data.Error == nil && !data.TakenAt.IsZero() && data.TakenAt.Year() > 1000 {
-		m.takenAt = data.TakenAt.UTC()
-		//		m.takenAtSrc = entity.SrcMeta
-		m.takenAtSrc = "meta"
-
-		log.Infof("media: %s was taken at %s (%s)", filepath.Base(m.fileName), m.takenAt.String(), m.takenAtSrc)
-
+		m.takenAt, m.takenAtSrc = data.TakenAt.UTC(), "meta"
+		//log.Infof("media: %s was taken at %s (%s)", filepath.Base(m.fileName), tMeta.String(), "meta")
 		return m.takenAt, m.takenAtSrc
 	}
 
 	if nameTime := txt.Time(m.fileName); !nameTime.IsZero() {
-		m.takenAt = nameTime
-		//		m.takenAtSrc = entity.SrcName
-		m.takenAtSrc = "name"
-
-		log.Infof("media: %s was taken at %s (%s)", filepath.Base(m.fileName), m.takenAt.String(), m.takenAtSrc)
-
-		return m.takenAt, m.takenAtSrc
+		tName = nameTime
+		if nameTime := txt.Time(m.BaseName()); !nameTime.IsZero() && nameTime.Before(tName) {
+			tName = nameTime
+		}
+		//log.Infof("media: %s was taken at %s (%s)", filepath.Base(m.fileName), tName.String(), "name")
 	}
-
-	m.takenAtSrc = "auto"
 
 	fileInfo, err := times.Stat(m.FileName())
-
-	if err != nil {
+	if err == nil {
+		if fileInfo.HasBirthTime() && fileInfo.BirthTime().Before(fileInfo.ModTime()) {
+			tAuto = fileInfo.BirthTime().UTC()
+			//log.Infof("media: %s was taken at %s ( birth time)", filepath.Base(m.fileName), tAuto.String(), "auto")
+		} else {
+			tAuto = fileInfo.ModTime().UTC()
+			//log.Infof("media: %s was taken at %s ( mod time)", filepath.Base(m.fileName), tAuto.String(), "auto")
+		}
+	} else {
 		log.Warnf("media: %s (file stat)", err.Error())
 		log.Infof("media: %s was taken at %s (now)", filepath.Base(m.fileName), m.takenAt.String())
-
-		return m.takenAt, m.takenAtSrc
 	}
 
-	if fileInfo.HasBirthTime() && fileInfo.BirthTime().Before(fileInfo.ModTime()) {
-		m.takenAt = fileInfo.BirthTime().UTC()
-		log.Infof("media: %s was taken at %s (file birth time)", filepath.Base(m.fileName), m.takenAt.String())
+	if tName.Before(tAuto) {
+		m.takenAt, m.takenAtSrc = tName, "name"
 	} else {
-		m.takenAt = fileInfo.ModTime().UTC()
-		log.Infof("media: %s was taken at %s (file mod time)", filepath.Base(m.fileName), m.takenAt.String())
+		m.takenAt, m.takenAtSrc = tAuto, "auto"
 	}
 
 	return m.takenAt, m.takenAtSrc
