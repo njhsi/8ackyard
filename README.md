@@ -2,9 +2,9 @@
 backup data smart and private
 
 ## usage
-$ apt install exiftool # MUST
-$ ./8ackyard index /mnt/media #only indexing
-$ ./8ackyard index /mnt/media -b /mnt/backup #backup into meida type(audio, video, photo) and date
+- $ apt install exiftool # MUST
+- $ ./8ackyard index /mnt/media #only indexing
+- $ ./8ackyard index /mnt/media -b /mnt/backup #backup into meida type(audio, video, photo) and date
 
 ## notes
 For this timebeing, this tool copied a lot from photoprism codes.
