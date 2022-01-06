@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/barasher/go-exiftool v1.7.0
+	github.com/cespare/xxhash/v2 v2.1.2
 	github.com/djherbis/times v1.5.0
 	github.com/dsoprea/go-exif/v3 v3.0.0-20210625224831-a6301f85c82b
 	github.com/dsoprea/go-heic-exif-extractor/v2 v2.0.0-20210512044107-62067e44c235

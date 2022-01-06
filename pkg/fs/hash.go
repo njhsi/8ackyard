@@ -7,6 +7,8 @@ import (
 	"hash/crc32"
 	"io"
 	"os"
+
+	"github.com/cespare/xxhash/v2"
 )
 
 func Md5sum(fileName string) string {
@@ -25,7 +27,7 @@ func Md5sum(fileName string) string {
 }
 
 // Hash returns the SHA1 hash of a file as string.
-func Hash(fileName string) string {
+func Sha1sum(fileName string) string {
 	var result []byte
 
 	file, err := os.Open(fileName)
@@ -43,6 +45,27 @@ func Hash(fileName string) string {
 	}
 
 	return hex.EncodeToString(hash.Sum(result))
+}
+
+func Hash(fileName string) string {
+	var result []byte
+
+	file, err := os.Open(fileName)
+
+	if err != nil {
+		return ""
+	}
+
+	defer file.Close()
+
+	hash := xxhash.New()
+
+	if _, err := io.Copy(hash, file); err != nil {
+		return ""
+	}
+
+	return hex.EncodeToString(hash.Sum(result))
+
 }
 
 // Checksum returns the CRC32 checksum of a file as string.
