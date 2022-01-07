@@ -51,7 +51,7 @@ func index_main(fileName string, ind *Index, opt IndexOptions, exifTool *exiftoo
 				continue
 			}
 			jsonName, err1 := f.ExifToolJsonName()
-			jsonFile, err2 := json.Marshal(fileInfo.Fields)
+			jsonFile, err2 := json.MarshalIndent(fileInfo.Fields, "", "")
 			if err1 == nil && err2 == nil {
 				ioutil.WriteFile(jsonName, jsonFile, 0644)
 			} else {
