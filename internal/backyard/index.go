@@ -11,7 +11,6 @@ import (
 	"github.com/barasher/go-exiftool"
 	"github.com/karrick/godirwalk"
 
-	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/mutex"
 	"github.com/njhsi/8ackyard/pkg/fs"
 )
@@ -34,10 +33,6 @@ func NewIndex(files *Files, photos *Photos) *Index {
 	return i
 }
 
-func (ind *Index) originalsPath() string {
-	return config.OriginalsPath()
-}
-
 // Cancel stops the current indexing operation.
 func (ind *Index) Cancel() {
 	mutex.MainWorker.Cancel()
@@ -53,8 +48,8 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	done := make(fs.Done)
 
-	originalsPath := ind.originalsPath()
-	optionsPath := filepath.Join(originalsPath, opt.Path)
+	originalsPath := opt.Path
+	optionsPath := opt.Path
 
 	if !fs.PathExists(optionsPath) {
 		log.Errorf("index: %s does not exist", optionsPath)

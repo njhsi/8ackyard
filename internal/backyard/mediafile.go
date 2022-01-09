@@ -17,7 +17,6 @@ import (
 
 	"github.com/djherbis/times"
 
-	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/meta"
 	"github.com/njhsi/8ackyard/pkg/fs"
 	"github.com/njhsi/8ackyard/pkg/sanitize"
@@ -275,27 +274,6 @@ func (m *MediaFile) EditedName() string {
 	return ""
 }
 
-// RelatedFiles returns files which are related to this file.
-
-// PathNameInfo returns file name infos for indexing.
-func (m *MediaFile) PathNameInfo(stripSequence bool) (fileRoot, fileBase, relativePath, relativeName string) {
-	fileRoot = m.Root()
-
-	var rootPath string
-
-	switch fileRoot {
-
-	default:
-		rootPath = config.OriginalsPath()
-	}
-
-	fileBase = m.BasePrefix(stripSequence)
-	relativePath = m.RelPath(rootPath)
-	relativeName = m.RelName(rootPath)
-
-	return fileRoot, fileBase, relativePath, relativeName
-}
-
 // FileName returns the filename.
 func (m *MediaFile) FileName() string {
 	return m.fileName
@@ -311,11 +289,6 @@ func (m *MediaFile) SetFileName(fileName string) {
 	m.fileName = fileName
 	//	m.fileRoot = entity.RootUnknown
 	m.fileRoot = "UNKNOWN" //TODO
-}
-
-// RootRelName returns the relative filename, and automatically detects the root path.
-func (m *MediaFile) RootRelName() string {
-	return m.RelName(m.RootPath())
 }
 
 // RelName returns the relative filename.
@@ -354,20 +327,6 @@ func (m *MediaFile) RelPath(directory string) string {
 	return pathname
 }
 
-// RootPath returns the file root path based on the configuration.
-func (m *MediaFile) RootPath() string {
-	switch m.Root() {
-
-	default:
-		return config.OriginalsPath()
-	}
-}
-
-// RootRelPath returns the relative path and automatically detects the root path.
-func (m *MediaFile) RootRelPath() string {
-	return m.RelPath(m.RootPath())
-}
-
 // RelPrefix returns the relative path and file name prefix.
 func (m *MediaFile) RelPrefix(directory string, stripSequence bool) string {
 	if relativePath := m.RelPath(directory); relativePath != "" {
@@ -390,22 +349,6 @@ func (m *MediaFile) SubDir(dir string) string {
 // BasePrefix returns the filename base without any extensions and path.
 func (m *MediaFile) BasePrefix(stripSequence bool) string {
 	return fs.BasePrefix(m.FileName(), stripSequence)
-}
-
-// Root returns the file root directory.
-func (m *MediaFile) Root() string {
-	if m.fileRoot != "UNKNOWN" {
-		return m.fileRoot
-	}
-
-	if strings.HasPrefix(m.FileName(), config.OriginalsPath()) {
-		m.fileRoot = config.OriginalsPath()
-		return m.fileRoot
-	}
-
-	//	importPath := config.ImportPath()
-
-	return m.fileRoot
 }
 
 // AbsPrefix returns the directory and base filename without any extensions.
@@ -651,49 +594,6 @@ func (m *MediaFile) IsMedia() bool {
 	return m.IsJpeg() || m.IsVideo() || m.IsRaw() || m.IsHEIF() || m.IsImageOther() || m.IsAudio()
 }
 
-// Jpeg returns a the JPEG version of the media file (if exists).
-func (m *MediaFile) Jpeg() (*MediaFile, error) {
-	if m.IsJpeg() {
-		if !fs.FileExists(m.FileName()) {
-			return nil, fmt.Errorf("jpeg file should exist, but does not: %s", m.FileName())
-		}
-
-		return m, nil
-	}
-
-	//	jpegFilename := fs.FormatJpeg.FindFirst(m.FileName(), []string{Config().SidecarPath(), fs.HiddenPath}, Config().OriginalsPath(), false)
-	jpegFilename := ""
-
-	if jpegFilename == "" {
-		return nil, fmt.Errorf("no jpeg found for %s", m.FileName())
-	}
-
-	return NewMediaFile(jpegFilename)
-}
-
-// ContainsJpeg returns true if this file has or is a jpeg media file.
-func (m *MediaFile) HasJpeg() bool {
-	if m.hasJpeg {
-		return true
-	}
-
-	if m.IsJpeg() {
-		m.hasJpeg = true
-		return true
-	}
-
-	//	jpegName := fs.FormatJpeg.FindFirst(m.FileName(), []string{Config().SidecarPath(), fs.HiddenPath}, Config().OriginalsPath(), false)
-	jpegName := ""
-
-	if jpegName == "" {
-		m.hasJpeg = false
-	} else {
-		m.hasJpeg = fs.MimeType(jpegName) == fs.MimeTypeJpeg
-	}
-
-	return m.hasJpeg
-}
-
 func (m *MediaFile) decodeDimensions() error {
 	if !m.IsMedia() {
 		return fmt.Errorf("failed decoding dimensions for %s", sanitize.Log(m.BaseName()))
@@ -808,10 +708,6 @@ func (m *MediaFile) ToJson() (jsonName string, err error) {
 	if fs.FileExists(jsonName) {
 		return jsonName, nil
 	}
-
-	relName := m.RelName(config.OriginalsPath())
-
-	log.Debugf("exiftool: extracting metadata from %s", relName)
 
 	cmd := exec.Command("exiftool", "-n", "-m", "-api", "LargeFileSupport", "-j", m.FileName())
 

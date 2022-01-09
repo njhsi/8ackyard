@@ -4,6 +4,9 @@ import (
 	"path"
 	"sync"
 	"time"
+
+	"github.com/njhsi/8ackyard/internal/config"
+	"github.com/timshannon/badgerhold/v4"
 )
 
 type FileMap map[string]int64
@@ -15,6 +18,17 @@ type Files struct {
 	files  FileMap
 	mfiles MediafilesMap
 	mutex  sync.RWMutex
+	store  *badgerhold.Store
+}
+
+type FileInStore struct {
+	ID         string `badgerholdIndex:"ID"`
+	Name       string
+	Size       int
+	Path       string
+	Hash       string
+	TakenAt    time.Time
+	TakenAtSrc string
 }
 
 // NewFiles returns a new Files instance.
@@ -37,8 +51,24 @@ func (m *Files) Init() error {
 		return nil
 	}
 
+	options := badgerhold.DefaultOptions
+	options.Dir = config.CachePath()
+	options.ValueDir = config.CachePath()
+
+	store, err := badgerhold.Open(options)
+	if err != nil {
+		log.Errorf("bolt open failed %s", config.CachePath()+"/"+"db.store")
+		return err
+	}
+	m.store = store
+
 	//	files, err := query.IndexedFiles()
 	files := make(FileMap)
+	fis := []FileInStore{}
+	if err := store.Find(&fis, nil); err != nil {
+		log.Errorf("bolt find failed %s %v", config.CachePath()+"/"+"db.store", err)
+	}
+	log.Infof("files: init - number of files in store %d", len(fis))
 
 	m.mfiles = make(MediafilesMap)
 	m.files = files
@@ -51,6 +81,9 @@ func (m *Files) Init() error {
 func (m *Files) Done() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	if m.store != nil {
+		m.store.Close()
+	}
 	if (len(m.files) - m.count) == 0 {
 		return
 	}
@@ -67,6 +100,7 @@ func (m *Files) Remove(fileName, fileRoot string) {
 	defer m.mutex.Unlock()
 
 	delete(m.files, key)
+	m.store.DeleteMatching(&FileInStore{}, badgerhold.Where("Name").Eq(key))
 }
 
 func (m *Files) Add(mf *MediaFile) {
@@ -80,6 +114,22 @@ func (m *Files) Add(mf *MediaFile) {
 	mfs := m.mfiles[fileSize]
 	mfs = append(mfs, mf)
 	m.mfiles[fileSize] = mfs
+
+	takenAt, takenAtSrc := mf.TakenAt()
+	fi := FileInStore{
+		ID:         mf.Hash(),
+		Name:       mf.FileName(),
+		Size:       int(mf.FileSize()),
+		Hash:       mf.Hash(),
+		TakenAt:    takenAt,
+		TakenAtSrc: takenAtSrc,
+	}
+
+	if err := m.store.Insert(fi.ID, &fi); err != nil {
+		log.Errorf("files: store.Insert error %v %s", err, fi.Name)
+	}
+	log.Infof("store.Upsert %s %s", fi.ID, fi.Name)
+
 }
 
 // Ignore tests of a file requires indexing, file name must be relative to the originals path.

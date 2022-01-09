@@ -2,9 +2,7 @@ package backyard
 
 import (
 	"fmt"
-	"path/filepath"
 
-	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/meta"
 	"github.com/njhsi/8ackyard/pkg/fs"
 )
@@ -53,27 +51,6 @@ func (m *MediaFile) MetaData() (result meta.Data) {
 		}
 
 		// Parse regular JSON sidecar files ("img_1234.json")
-		if !m.IsSidecar() {
-			if jsonFiles := fs.FormatJson.FindAll(m.FileName(), []string{config.SidecarPath(), fs.HiddenPath}, config.OriginalsPath(), false); len(jsonFiles) == 0 {
-				log.Tracef("metadata: found no additional sidecar file for %s", filepath.Base(m.FileName()))
-			} else {
-				for _, jsonFile := range jsonFiles {
-					jsonErr := m.metaData.JSON(jsonFile, m.BaseName())
-
-					if jsonErr != nil {
-						log.Debug(jsonErr)
-					} else {
-						err = nil
-					}
-				}
-			}
-
-			if jsonErr := m.ReadExifToolJson(); jsonErr != nil {
-				log.Debug(jsonErr)
-			} else {
-				err = nil
-			}
-		}
 
 		if err != nil {
 			m.metaData.Error = err

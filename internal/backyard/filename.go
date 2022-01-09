@@ -2,17 +2,11 @@ package backyard
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 
 	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/pkg/fs"
 )
-
-func FileName(fileRoot, fileName string) string {
-	return path.Join(config.OriginalsPath(), fileName)
-
-}
 
 // CachePath returns a cache directory name based on the base path, file hash and cache namespace.
 func CachePath(fileHash, namespace string) (cachePath string, err error) {

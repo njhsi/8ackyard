@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/njhsi/8ackyard/internal/backyard"
-	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/service"
 	"github.com/njhsi/8ackyard/pkg/fs"
 )
@@ -60,10 +58,10 @@ func indexAction(ctx *cli.Context) error {
 	subPath := strings.TrimSpace(ctx.Args().First())
 
 	if subPath == "" {
-		log.Errorf("indexing not going as subpath is not provided, but it's a must for originals=%s", config.OriginalsPath())
+		log.Errorf("indexing not going as subpath is not provided, but it's a must for originals=%s", subPath)
 		return nil
 	} else {
-		log.Infof("indexing originals= %s, backup=%s, n=%d", filepath.Join(config.OriginalsPath(), subPath), backupPath, numWorkers)
+		log.Infof("indexing originals= %s, backup=%s, n=%d", subPath, backupPath, numWorkers)
 	}
 
 	var indexed fs.Done

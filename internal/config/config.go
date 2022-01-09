@@ -1,9 +1,5 @@
 package config
 
-func OriginalsPath() string {
-	return "/"
-}
-
 func CachePath() string {
 	return "/tmp/Caches"
 }

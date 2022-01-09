@@ -76,7 +76,7 @@ func index_main(fileName string, ind *Index, opt IndexOptions, exifTool *exiftoo
 	takenAt, src := f.TakenAt()
 	ind.files.Add(f)
 
-	log.Infof("index: %s ma!n %s file %s %s.%s", result, f.FileType(), sanitize.Log(f.RelName(ind.originalsPath())), takenAt, src)
+	log.Infof("index: %s ma!n %s file %s %s.%s", result, f.FileType(), sanitize.Log(f.RelName(opt.Path)), takenAt, src)
 
 	return result
 }
