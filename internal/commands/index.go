@@ -2,6 +2,8 @@ package commands
 
 import (
 	"context"
+	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -68,11 +70,17 @@ func indexAction(ctx *cli.Context) error {
 
 	// Use first argument to limit scope if set.
 	subPath := strings.TrimSpace(ctx.Args().First())
-
 	if subPath == "" {
 		log.Errorf("indexing not going as subpath is not provided, but it's a must for originals=%s", subPath)
 		return nil
 	} else {
+		if strings.HasPrefix(subPath, "/") || strings.HasPrefix(subPath, "~") {
+
+		} else {
+			cwd, _ := os.Getwd()
+			subPath = path.Join(cwd, subPath)
+		}
+		subPath = path.Clean(subPath)
 		log.Infof("indexing originals= %s, backup=%s, cache=%s, n=%d", subPath, backupPath, cachePath, numWorkers)
 	}
 

@@ -21,13 +21,13 @@ type Files struct {
 }
 
 type FileInStore struct {
-	ID         string `badgerholdIndex:"ID"`
-	Name       string
-	Size       int
-	Path       string
-	Hash       string
-	TakenAt    time.Time
-	TakenAtSrc string
+	ID      string `badgerholdIndex:"ID"` //xxhash of file content
+	Hash    string `badgerhold:"unique"`
+	Size    int
+	Name    string
+	PathMap map[string]int64 //fullpath:modtime
+	Type    string
+	Info    string
 }
 
 // NewFiles returns a new Files instance.
@@ -114,20 +114,34 @@ func (m *Files) Add(mf *MediaFile) {
 	mfs = append(mfs, mf)
 	m.mfiles[fileSize] = mfs
 
+	fullPath, mtime := mf.FileName(), mf.modTime.Unix()
 	takenAt, takenAtSrc := mf.TakenAt()
 	fi := FileInStore{
-		ID:         mf.Hash(),
-		Name:       mf.FileName(),
-		Size:       int(mf.FileSize()),
-		Hash:       mf.Hash(),
-		TakenAt:    takenAt,
-		TakenAtSrc: takenAtSrc,
+		ID:      mf.Hash(),
+		Name:    mf.BaseName(),
+		Size:    int(mf.FileSize()),
+		Hash:    mf.Hash(),
+		PathMap: map[string]int64{fullPath: mtime},
 	}
 
-	if err := m.store.Insert(fi.ID, &fi); err != nil {
+	err := m.store.Insert(fi.ID, &fi)
+	if err == badgerhold.ErrKeyExists {
+		log.Infof("files: store.Insert key=%s existed for %s, update", fi.ID, fullPath)
+		if err = m.store.FindOne(&fi, badgerhold.Where("ID").Eq(mf.Hash())); err == nil {
+			mtime2, bExisted := fi.PathMap[fullPath]
+			if bExisted == true && mtime != mtime2 {
+				//TODO: choose a better one to update?
+				log.Warnf("files: store.Insert file=%s existed. time %v-> %v", fullPath, mtime, mtime2)
+			}
+			if bExisted == false || mtime != mtime2 {
+				fi.PathMap[fullPath] = mf.ModTime().Unix()
+				m.store.Update(fi.ID, &fi)
+			}
+		}
+	} else if err != nil {
 		log.Errorf("files: store.Insert error %v %s", err, fi.Name)
 	}
-	log.Infof("store.Upsert %s %s", fi.ID, fi.Name)
+	log.Infof("store.Upsert %s %s %s %s, paths=%v", fi.ID, fi.Name, takenAt, takenAtSrc, fi.PathMap)
 
 }
 

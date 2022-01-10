@@ -17,6 +17,7 @@ import (
 
 	"github.com/djherbis/times"
 
+	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/meta"
 	"github.com/njhsi/8ackyard/pkg/fs"
 	"github.com/njhsi/8ackyard/pkg/sanitize"
@@ -48,7 +49,7 @@ type MediaFile struct {
 func NewMediaFile(fileName string) (*MediaFile, error) {
 	m := &MediaFile{
 		fileName: fileName,
-		fileRoot: "UNKNOW",
+		fileRoot: config.FileRoot,
 		fileType: fs.FormatOther,
 		metaData: meta.NewData(),
 		width:    -1,

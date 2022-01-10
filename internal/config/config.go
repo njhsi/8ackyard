@@ -1,6 +1,7 @@
 package config
 
 var CacheDir = "/tmp/cache8/"
+var FileRoot = "/"
 
 func CachePath() string {
 	return CacheDir

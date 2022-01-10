@@ -92,6 +92,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		log.Errorf("index: %s", err)
 	}
 	config.CacheDir = opt.CachePath
+	config.FileRoot = opt.Path
 
 	defer ind.files.Done()
 
