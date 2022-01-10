@@ -3,6 +3,7 @@ package backyard
 type IndexOptions struct {
 	Path       string
 	BackupPath string
+	CachePath  string
 	NumWorkers int
 	Rescan     bool
 	Convert    bool

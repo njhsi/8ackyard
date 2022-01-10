@@ -11,6 +11,7 @@ import (
 	"github.com/barasher/go-exiftool"
 	"github.com/karrick/godirwalk"
 
+	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/mutex"
 	"github.com/njhsi/8ackyard/pkg/fs"
 )
@@ -87,9 +88,10 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	}
 
-	if err := ind.files.Init(); err != nil {
+	if err := ind.files.Init(opt.CachePath); err != nil {
 		log.Errorf("index: %s", err)
 	}
+	config.CacheDir = opt.CachePath
 
 	defer ind.files.Done()
 

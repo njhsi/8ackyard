@@ -1,11 +1,9 @@
 package config
 
-func CachePath() string {
-	return "/tmp/Caches"
-}
+var CacheDir = "/tmp/cache8/"
 
-func SidecarPath() string {
-	return "/tmp/Caches/sidecar"
+func CachePath() string {
+	return CacheDir
 }
 
 func OriginalsLimit() int64 {

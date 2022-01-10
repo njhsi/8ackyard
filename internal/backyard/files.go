@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/timshannon/badgerhold/v4"
 )
 
@@ -42,7 +41,7 @@ func NewFiles() *Files {
 }
 
 // Init fetches the list from the database once.
-func (m *Files) Init() error {
+func (m *Files) Init(storePath string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -52,12 +51,12 @@ func (m *Files) Init() error {
 	}
 
 	options := badgerhold.DefaultOptions
-	options.Dir = config.CachePath()
-	options.ValueDir = config.CachePath()
+	options.Dir = storePath + "/db"
+	options.ValueDir = storePath + "/db"
 
 	store, err := badgerhold.Open(options)
 	if err != nil {
-		log.Errorf("bolt open failed %s", config.CachePath()+"/"+"db.store")
+		log.Errorf("bolt open failed %s", storePath)
 		return err
 	}
 	m.store = store
@@ -66,7 +65,7 @@ func (m *Files) Init() error {
 	files := make(FileMap)
 	fis := []FileInStore{}
 	if err := store.Find(&fis, nil); err != nil {
-		log.Errorf("bolt find failed %s %v", config.CachePath()+"/"+"db.store", err)
+		log.Errorf("bolt find failed %s %v", storePath, err)
 	}
 	log.Infof("files: init - number of files in store %d", len(fis))
 

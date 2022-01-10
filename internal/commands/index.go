@@ -37,6 +37,11 @@ var indexFlags = []cli.Flag{
 		Usage: "backup to where, after indexing",
 		Value: "",
 	},
+	cli.StringFlag{
+		Name:  "cache, s",
+		Usage: "cache path",
+		Value: "",
+	},
 	cli.IntFlag{
 		Name:  "workers, n",
 		Usage: "number of workers",
@@ -52,6 +57,13 @@ func indexAction(ctx *cli.Context) error {
 	defer cancel()
 
 	backupPath := ctx.String("backup")
+	cachePath := ctx.String("cache")
+	if cachePath == "" && backupPath != "" {
+		cachePath = backupPath + "/.cache8"
+	}
+	if cachePath == "" {
+		cachePath = "/tmp/cache8/"
+	}
 	numWorkers := ctx.Int("workers")
 
 	// Use first argument to limit scope if set.
@@ -61,7 +73,7 @@ func indexAction(ctx *cli.Context) error {
 		log.Errorf("indexing not going as subpath is not provided, but it's a must for originals=%s", subPath)
 		return nil
 	} else {
-		log.Infof("indexing originals= %s, backup=%s, n=%d", subPath, backupPath, numWorkers)
+		log.Infof("indexing originals= %s, backup=%s, cache=%s, n=%d", subPath, backupPath, cachePath, numWorkers)
 	}
 
 	var indexed fs.Done
@@ -70,6 +82,7 @@ func indexAction(ctx *cli.Context) error {
 		opt := backyard.IndexOptions{
 			Path:       subPath,
 			BackupPath: backupPath,
+			CachePath:  cachePath,
 			NumWorkers: numWorkers,
 			Rescan:     true,
 			Convert:    false,
