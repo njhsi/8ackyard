@@ -25,7 +25,7 @@ type Index struct {
 }
 
 // NewIndex returns a new indexer and expects its dependencies as arguments.
-func NewIndex(files *Files, photos *Photos) *Index {
+func NewIndex(files *Files) *Index {
 
 	i := &Index{
 		files: files,

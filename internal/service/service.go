@@ -10,8 +10,7 @@ var services struct {
 	CoverCache  *gc.Cache
 	ThumbCache  *gc.Cache
 	//	Convert     *backyard.Convert
-	Files  *backyard.Files
-	Photos *backyard.Photos
+	Files *backyard.Files
 	//	Import      *backyard.Import
 	Index *backyard.Index
 	//	Moments     *backyard.Moments
