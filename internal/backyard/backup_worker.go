@@ -107,10 +107,10 @@ func new_backup_main(mFiles MediaFiles, ind *Index, opt BackupOptions) {
 				mf.Copy(fi.Name)
 			} else if fs.FileExists(fi.Name) == true && backupTo != fi.Name {
 				//link it
-				log.Infof("backup: DO LINK for mf=%s, %s -> %s", fullPath, fi.Name, backupTo)
+				log.Infof("backup: DO LINK for mf=%s,(backupTo->fiName) %s -> %s", fullPath, backupTo, fi.Name)
 				os.Symlink(fi.Name, backupTo)
 			} else {
-				log.Infof("backup: Do nothing, mf=%s existed in backup,fi=%s, backupTo=%s", fullPath, fi.Name, backupTo)
+				log.Infof("backup: DO NOTHING for mf=%s, already existed in backup,fi=%s, backupTo=%s", fullPath, fi.Name, backupTo)
 			}
 
 			log.Infof("backup: DONE mf=%s key=%s fiName=%s backupTo=%s %s %s, map=%v", fullPath, fi.ID, fi.Name, backupTo, takenAt, takenAtSrc, fi.PathMap)
