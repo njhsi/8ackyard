@@ -20,16 +20,15 @@ import (
 // Index represents an indexer that indexes files in the originals directory.
 type Index struct {
 	//	convert *Convert
-	files       *Files
+	mutex       sync.RWMutex // storeIndex
+	storeIndex  *badgerhold.Store
 	storeBackup *badgerhold.Store
 }
 
 // NewIndex returns a new indexer and expects its dependencies as arguments.
-func NewIndex(files *Files) *Index {
+func NewIndex() *Index {
 
-	i := &Index{
-		files: files,
-	}
+	i := &Index{}
 
 	return i
 }
@@ -37,6 +36,29 @@ func NewIndex(files *Files) *Index {
 // Cancel stops the current indexing operation.
 func (ind *Index) Cancel() {
 	mutex.MainWorker.Cancel()
+}
+
+func (ind *Index) initStoreIndex(storePath string) error {
+	options := badgerhold.DefaultOptions
+	options.Dir = storePath + "/indexed.db"
+	options.ValueDir = storePath + "/indexed.db"
+
+	store, err := badgerhold.Open(options)
+	if err != nil {
+		log.Errorf("initStoreIndex: Open - db open failed %s", storePath)
+		return err
+	}
+
+	ind.storeIndex = store
+
+	fis := []FileIndexed{}
+	if err := store.Find(&fis, nil); err != nil {
+		log.Errorf("initStoreIndex: Find -  find failed %s %v", storePath, err)
+		return err
+	}
+	log.Infof("initStoreIndex:  number of files in store %d", len(fis))
+
+	return nil
 }
 
 func (ind *Index) initStoreBacup(storePath string) error {
@@ -76,6 +98,12 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		return done
 	}
 
+	if err := ind.initStoreIndex(opt.CachePath); err != nil {
+		log.Errorf("index: ind.initStoreIndex failed %s", err)
+		return done
+	}
+	defer ind.storeIndex.Close()
+
 	if err := mutex.MainWorker.Start(); err != nil {
 		log.Errorf("index: %s", err.Error())
 		return done
@@ -107,13 +135,8 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	}
 
-	if err := ind.files.Init(opt.CachePath); err != nil {
-		log.Errorf("index: %s", err)
-	}
 	config.CacheDir = opt.CachePath
 	config.FileRoot = opt.Path
-
-	defer ind.files.Done()
 
 	filesIndexed := 0
 	ignore := fs.NewIgnoreList(fs.IgnoreFile, true, false)
@@ -171,9 +194,9 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 				return nil
 			}
 
-			if ind.files.Indexed(relName, "/", mf.modTime, opt.Rescan) {
-				return nil
-			}
+			//			if ind.files.Indexed(relName, "/", mf.modTime, opt.Rescan) {
+			//				return nil
+			//			}
 
 			done[fileName] = fs.Processed
 
@@ -211,7 +234,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	// BACKUP to destine
 	if opt.BackupPath != "" {
 		if err := ind.initStoreBacup(opt.CachePath); err != nil {
-			log.Errorf("index: photos.Init failed %s", err)
+			log.Errorf("index: ind.initStoreBacup failed %s", err)
 			return done
 		}
 		defer ind.storeBackup.Close()
@@ -231,14 +254,19 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 				wg.Done()
 			}()
 		}
-		for kFileSize, vMfiles := range ind.files.mfiles {
-			log.Infof("backup: size=%d, %d mfs", kFileSize, len(vMfiles))
+
+		ind.mutex.RLock()
+		defer ind.mutex.RUnlock()
+		ind.storeIndex.ForEach(nil, func(fi *FileIndexed) error {
+			log.Infof("backup: key=%d, %d mfs", fi.ID, fi.Path)
 			jobs2 <- BackupJob{
 				BackupOpt: backupOpt,
-				Ind:       ind,
-				MFiles:    vMfiles,
+				Store:     ind.storeBackup,
+				File:      fi,
 			}
-		}
+			return nil
+		})
+
 		close(jobs2)
 		wg.Wait()
 		runtime.GC()

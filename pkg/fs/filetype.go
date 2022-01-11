@@ -232,7 +232,7 @@ func GetFileFormat(fileName string) FileFormat {
 			if !ok {
 				result = FormatOther
 			}
-			println("GetFileFormat:", typ.Extension, typ.MIME.Value, fileName, result)
+			//			println("GetFileFormat:", typ.Extension, typ.MIME.Value, fileName, result)
 		}
 	}
 

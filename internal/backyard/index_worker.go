@@ -2,14 +2,37 @@ package backyard
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
 
 	"github.com/barasher/go-exiftool"
 	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/pkg/sanitize"
+	"github.com/timshannon/badgerhold/v4"
 )
+
+type FileIndexed struct {
+	ID       string `badgerholdIndex:"ID"` //xxhash of file content
+	Path     string //full path
+	TimeBorn int64
+	TimeSrc  string
+	Size     int
+	Hash     string `badgerhold:"unique"`
+	Format   string
+	Mime     string
+	Duplica  map[string]int64 //fullpath:modtime
+	Info     string
+}
+
+type IndexOptions struct {
+	Path       string
+	BackupPath string
+	CachePath  string
+	NumWorkers int
+	Rescan     bool
+	Convert    bool
+	Stack      bool
+}
 
 type IndexJob struct {
 	FileName string
@@ -20,32 +43,30 @@ type IndexJob struct {
 func IndexWorker(jobs <-chan IndexJob, et *exiftool.Exiftool) {
 	for job := range jobs {
 		log.Infof("IndexWorker:                           fileName=%s", job.FileName)
-		index_main(job.FileName, job.Ind, job.IndexOpt, et)
+		mainIndex(job.FileName, job.Ind, job.IndexOpt, et)
 	}
 }
 
-func index_main(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool.Exiftool) (result IndexResult) {
+func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool.Exiftool) error {
 	f, err := NewMediaFile(fileName)
 	if err != nil {
-		result.Err = fmt.Errorf("index: found no  mediafile for %s", sanitize.Log(fileName))
-		result.Status = IndexFailed
-		return result
+		log.Errorf("index_main: found no  mediafile for %s", sanitize.Log(fileName))
+		return err
 	}
 
 	sizeLimit := config.OriginalsLimit()
 
 	// Enforce file size limit for originals.
 	if sizeLimit > 0 && f.FileSize() > sizeLimit {
-		result.Err = fmt.Errorf("index: %s (%d/%dM)", sanitize.Log(f.BaseName()), f.FileSize()/(1024*1024), sizeLimit/(1024*1024))
-		result.Status = IndexFailed
-		return result
+		log.Errorf("index_main: %s (%d/%dM)", f.FileName(), f.FileSize()/(1024*1024), sizeLimit/(1024*1024))
+		return nil
 	}
 
 	if exifTool != nil && f.NeedsExifToolJson() {
 		fileInfos := exifTool.ExtractMetadata(fileName)
 		for _, fileInfo := range fileInfos {
 			if fileInfo.Err != nil {
-				log.Errorf("index: Error in exiftool %v: %v\n", fileInfo.File, fileInfo.Err)
+				log.Errorf("index_main: Error in exiftool %v: %v\n", fileInfo.File, fileInfo.Err)
 				continue
 			}
 			jsonName, err1 := f.ExifToolJsonName()
@@ -53,7 +74,7 @@ func index_main(fileName string, ind *Index, opt IndexOptions, exifTool *exiftoo
 			if err1 == nil && err2 == nil {
 				ioutil.WriteFile(jsonName, jsonFile, 0644)
 			} else {
-				log.Errorf("index: exifTool on %s %s,%s,%s|%s", fileInfo.File, f.Hash(), jsonName, err1, err2)
+				log.Errorf("index_main: exifTool on %s %s,%s,%s|%s", fileInfo.File, f.Hash(), jsonName, err1, err2)
 
 			}
 
@@ -62,19 +83,68 @@ func index_main(fileName string, ind *Index, opt IndexOptions, exifTool *exiftoo
 
 	if f.NeedsExifToolJson() {
 		if jsonName, err := f.ToJson(); err != nil {
-			log.Debugf("index: %s in %s (extract metadata)", sanitize.Log(err.Error()), sanitize.Log(f.BaseName()))
+			log.Debugf("index_main: %s in %s (extract metadata)", sanitize.Log(err.Error()), sanitize.Log(f.BaseName()))
 		} else {
-			log.Debugf("index: created %s (extract metadata)", filepath.Base(jsonName))
+			log.Debugf("index_main: created %s (extract metadata)", filepath.Base(jsonName))
 			f.ReadExifToolJson()
 		}
 	}
 
 	//	result = ind.MediaFile(f, opt, "")
-	result.Status = IndexAdded
 	takenAt, src := f.TakenAt()
-	ind.files.Add(f)
+	add(ind, f)
 
-	log.Infof("index: %s ma!n %s file %s %s.%s", result, f.FileType(), sanitize.Log(f.RelName(opt.Path)), takenAt, src)
+	log.Infof("index_main: DONE mf=%s(%), %s %s.%s", f.FileName(), f.FileType(), f.Hash(), takenAt, src)
 
-	return result
+	return nil
+}
+
+func add(ind *Index, mf *MediaFile) {
+	ind.mutex.Lock()
+	defer ind.mutex.Unlock()
+
+	store := ind.storeIndex
+	fullPath, mtime := mf.FileName(), mf.modTime.Unix()
+	takenAt, takenAtSrc := mf.TakenAt()
+	info := "ukn"
+	switch {
+	case mf.IsPhoto():
+		info = "photo"
+	case mf.IsVideo():
+		info = "video"
+	case mf.IsAudio():
+		info = "audio"
+	}
+
+	fi := FileIndexed{
+		ID:       mf.Hash(),
+		Path:     mf.FileName(),
+		TimeBorn: takenAt.Unix(),
+		TimeSrc:  takenAtSrc,
+		Size:     int(mf.FileSize()),
+		Hash:     mf.Hash(),
+		Format:   string(mf.FileType()),
+		Mime:     mf.MimeType(),
+		Duplica:  map[string]int64{fullPath: mtime},
+		Info:     info,
+	}
+
+	err := store.Insert(fi.ID, &fi)
+	if err == badgerhold.ErrKeyExists {
+		log.Infof("index: - add - Insert key=%s existed for %s, updating ..", fi.ID, fullPath)
+		if err = store.FindOne(&fi, badgerhold.Where("ID").Eq(mf.Hash())); err == nil {
+			mtime2, bExisted := fi.Duplica[fullPath]
+			if bExisted == true && mtime != mtime2 {
+				//TODO: choose a better one to update?
+				log.Warnf("index: - add - Insert file=%s existed. time %v-> %v", fullPath, mtime, mtime2)
+			}
+			if bExisted == false || mtime < mtime2 {
+				fi.Duplica[fullPath] = mf.ModTime().Unix()
+				store.Update(fi.ID, &fi)
+			}
+		}
+	} else if err != nil {
+		log.Errorf("index: - add - Insert error %v %s", err, fi.Path)
+	}
+	log.Infof("index: - add - DONE %s %s %s %s, paths=%v", fi.ID, fi.Path, takenAt, takenAtSrc, fi.Duplica)
 }

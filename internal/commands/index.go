@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"os"
+	"os/signal"
 	"path"
 	"strings"
 	"time"
@@ -51,12 +52,29 @@ var indexFlags = []cli.Flag{
 	},
 }
 
+func handleContext() {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt)
+	defer func() {
+		signal.Stop(signalChan)
+		cancel()
+	}()
+	go func() {
+		select {
+		case <-signalChan: // first signal, cancel context
+			cancel()
+		case <-ctx.Done():
+		}
+		<-signalChan // second signal, hard exit
+		os.Exit(2)
+	}()
+}
+
 // indexAction indexes all photos in originals directory (photo library)
 func indexAction(ctx *cli.Context) error {
 	start := time.Now()
-
-	_, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	handleContext()
 
 	backupPath := ctx.String("backup")
 	cachePath := ctx.String("cache")

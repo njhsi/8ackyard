@@ -7,6 +7,19 @@ import (
 	"path/filepath"
 )
 
+func CopyWithStat(src, dest string) (err error) {
+	if err := Copy(src, dest); err != nil {
+		return nil
+	}
+	si, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	err = os.Chmod(dest, si.Mode())
+	err = os.Chtimes(dest, si.ModTime(), si.ModTime())
+	return nil
+}
+
 // Copies a file to a destination.
 func Copy(src, dest string) (err error) {
 	defer func() {

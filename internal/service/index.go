@@ -9,7 +9,7 @@ import (
 var onceIndex sync.Once
 
 func initIndex() {
-	services.Index = backyard.NewIndex(Files())
+	services.Index = backyard.NewIndex()
 }
 
 func Index() *backyard.Index {

@@ -13,8 +13,8 @@ type FileBacked struct {
 	ID      string `badgerholdIndex:"ID"` //xxhash of file content
 	Hash    string `badgerhold:"unique"`
 	Size    int
-	Name    string
-	PathMap map[string]int64 //fullpath:modtime
+	Path    string           //full path, regular file existed on device
+	Duplica map[string]int64 //fullpath:modtime
 	Type    string
 	Info    string
 }
@@ -30,149 +30,74 @@ type BackupOptions struct {
 
 type BackupJob struct {
 	BackupOpt BackupOptions
-	Ind       *Index
-	MFiles    MediaFiles
+	Store     *badgerhold.Store
+	File      *FileIndexed
 }
 
 func BackupWorker(jobs <-chan BackupJob) {
 	for job := range jobs {
-		log.Infof("BackupWorker:                           mfs=%d", len(job.MFiles))
-		new_backup_main(job.MFiles, job.Ind, job.BackupOpt)
+		log.Infof("BackupWorker:                           mfs=%d", len(job.File.Path))
+		mainBackup(job.File, job.Store, job.BackupOpt)
 	}
 }
 
-func new_backup_main(mFiles MediaFiles, ind *Index, opt BackupOptions) {
-	mapMfiles := map[string]MediaFiles{}
-	store := ind.storeBackup
-	for _, mf := range mFiles {
-		mapMfiles[mf.Hash()] = append(mapMfiles[mf.Hash()], mf)
-		log.Infof("backup: mf=%s size=%d  sha1=%s", mf.FileName(), mf.FileSize(), mf.Hash())
-	}
-
-	// mfiles are of the same size, so that no need to consider store concurrency lock for updating ..
+func mainBackup(file *FileIndexed, store *badgerhold.Store, opt BackupOptions) {
 	timeLoc, _ := time.LoadLocation("Asia/Chongqing")
-	for _, mfs := range mapMfiles {
-		for _, mf := range mfs {
-			fullPath, mtime, hash := mf.FileName(), mf.modTime.Unix(), mf.Hash()
-			takenAt, takenAtSrc := mf.TakenAt()
-			takenAt = takenAt.In(timeLoc)
-			mType := "unknown"
-			if mf.IsPhoto() {
-				mType = "photo"
-			} else if mf.IsVideo() {
-				mType = "video"
-			} else if mf.IsAudio() {
-				mType = "audio"
-			}
 
-			backupTo := opt.BackupPath + "/" + mType + "/" + takenAt.Format("2006/01/02") + "/" + mf.BaseName()
-			backupTo = path.Clean(backupTo)
-			for fs.FileExists(backupTo) && fs.Hash(backupTo) != hash {
-				log.Warnf("backup: same name but diff hash: %s ->%s", backupTo, mf.FileName())
-				backupTo = backupTo + "_" + hash
-			}
-			fi := FileBacked{
-				ID:      hash,
-				Name:    backupTo,
-				Size:    int(mf.FileSize()),
-				Hash:    hash,
-				PathMap: map[string]int64{backupTo: mtime},
-			}
+	baseName, fullPath, hash, mType := path.Base(file.Path), file.Path, file.Hash, file.Info
+	takenAt, takenAtSrc := time.Unix(file.TimeBorn, 0).In(timeLoc), file.TimeSrc
+	mtime := fs.BirthTime(fullPath).Unix() //TODO: birthtime not works?
 
-			err := store.Insert(fi.ID, &fi)
-			if err == badgerhold.ErrKeyExists {
-				log.Infof("backup: Insert failed, key=%s existed for mf=%s, need to update..", fi.ID, fullPath)
-				if err = store.FindOne(&fi, badgerhold.Where("ID").Eq(hash)); err == nil {
-					mtime2, bExisted := fi.PathMap[backupTo]
-					if bExisted == true && mtime != mtime2 {
-						//TODO: choose a better one to update?
-						log.Warnf("backup: Update? key=%s and mf=%s existed, but time %v->%v", fi.ID, fullPath, mtime, mtime2)
-					}
-					if bExisted == false || mtime != mtime2 {
-						log.Infof("backup: Update key=%s existed,mf=%s, time same %s, fiName existed %s", fi.ID, bExisted, mtime == mtime2, fs.FileExists(fi.Name))
-						if fs.FileExists(fi.Name) == false {
-							fi.Name = backupTo
-						}
-						fi.PathMap[backupTo] = mf.ModTime().Unix()
-						store.Update(fi.ID, &fi)
-					}
-				}
-			} else if err != nil {
-				log.Errorf("backup: Insert error %v %s", err, fi.Name)
-			}
+	backupTo := opt.BackupPath + "/" + mType + "/" + takenAt.Format("2006/01/02") + "/" + baseName
+	backupTo = path.Clean(backupTo)
+	for fs.FileExists(backupTo) && fs.Hash(backupTo) != hash {
+		log.Warnf("backup: same name but diff hash: %s ->%s", backupTo, file.Path)
+		backupTo = backupTo + "_" + hash
+	}
+	log.Infof("backup: STARTing file=%s, %s -> %s , %s, %v(%s)", baseName, fullPath, backupTo, hash, takenAt, takenAtSrc)
 
-			if fs.FileExists(fi.Name) == false {
-				// copy it
-				log.Infof("backup: DO COPY for mf=%s, -> %s , backupTo=%s", fullPath, fi.Name, backupTo)
-				mf.Copy(fi.Name)
-			} else if fs.FileExists(fi.Name) == true && backupTo != fi.Name {
-				//link it
-				log.Infof("backup: DO LINK for mf=%s,(backupTo->fiName) %s -> %s", fullPath, backupTo, fi.Name)
-				os.Symlink(fi.Name, backupTo)
-			} else {
-				log.Infof("backup: DO NOTHING for mf=%s, already existed in backup,fi=%s, backupTo=%s", fullPath, fi.Name, backupTo)
-			}
-
-			log.Infof("backup: DONE mf=%s key=%s fiName=%s backupTo=%s %s %s, map=%v", fullPath, fi.ID, fi.Name, backupTo, takenAt, takenAtSrc, fi.PathMap)
-		}
+	fb := FileBacked{
+		ID:      hash,
+		Path:    backupTo,
+		Size:    file.Size,
+		Hash:    hash,
+		Duplica: map[string]int64{backupTo: mtime},
 	}
 
-}
+	err := store.Insert(fb.ID, &fb)
+	if err == badgerhold.ErrKeyExists {
+		log.Infof("backup: Insert failed, key=%s existed for mf=%s, need to update..", fb.ID, fullPath)
+		if err = store.FindOne(&fb, badgerhold.Where("ID").Eq(hash)); err == nil {
+			mtime2, bExisted := fb.Duplica[backupTo]
+			if bExisted == true && mtime != mtime2 {
+				//TODO: choose a better one to update?
+				log.Warnf("backup: Update? key=%s and mf=%s existed, but time %v->%v", fb.ID, fullPath, mtime, mtime2)
+			}
+			if bExisted == false || mtime != mtime2 {
+				log.Infof("backup: Update key=%s existed,mf=%s, time same %s, fiName existed %s", fb.ID, bExisted, mtime == mtime2, fs.FileExists(fb.Path))
+				if fs.FileExists(fb.Path) == false {
+					fb.Path = backupTo
+				}
+				fb.Duplica[backupTo] = file.TimeBorn
+				store.Update(fb.ID, &fb)
+			}
+		}
+	} else if err != nil {
+		log.Errorf("backup: Insert error %v %s", err, fb.Path)
+	}
 
-func backup_main(mFiles MediaFiles, ind *Index, opt BackupOptions) (result IndexResult) {
-	sumMfiles := map[string]MediaFiles{}
-	if len(mFiles) == 1 { // no need to do hash
-		sumMfiles[""] = mFiles
-		log.Infof("backup: mf=%s size=%d  sha1=%s", mFiles[0].FileName(), mFiles[0].FileSize(), mFiles[0].Hash())
+	if fs.FileExists(fb.Path) == false {
+		// copy it
+		log.Infof("backup: DO COPY for mf=%s, -> %s , backupTo=%s", fullPath, fb.Path, backupTo)
+		fs.CopyWithStat(fullPath, fb.Path)
+	} else if fs.FileExists(fb.Path) == true && backupTo != fb.Path {
+		//link it
+		log.Infof("backup: DO LINK for mf=%s,(backupTo->fiName) %s -> %s", fullPath, backupTo, fb.Path)
+		os.Symlink(fb.Path, backupTo)
 	} else {
-		for _, mf := range mFiles {
-			sumMfiles[mf.Hash()] = append(sumMfiles[mf.Hash()], mf)
-			log.Infof("backup: mf=%s size=%d  sha1=%s", mf.FileName(), mf.FileSize(), mf.Hash())
-		}
-	}
-	for _, mfs := range sumMfiles { //TODO: job the vMfiles of each Hash
-		var mfBest *MediaFile = nil
-		for _, mf := range mfs {
-			//TODO: save dups info into a txt file, in case ..
-			takenAt, src := mf.TakenAt()
-			if src == "meta" {
-				mfBest = mf
-				break
-			} else {
-				if mfBest == nil {
-					mfBest = mf
-				} else {
-					takenAtBest, _ := mfBest.TakenAt()
-					if takenAt.Before(takenAtBest) {
-						mfBest = mf
-					}
-				}
-			}
-		}
-		//do!
-		if mfBest != nil {
-			loc, _ := time.LoadLocation("Asia/Chongqing")
-			takenAt, src := mfBest.TakenAt()
-			takenAt = takenAt.In(loc)
-			mType := "unknown"
-			if mfBest.IsPhoto() {
-				mType = "photo"
-			} else if mfBest.IsVideo() {
-				mType = "video"
-			} else if mfBest.IsAudio() {
-				mType = "audio"
-			}
-
-			backupTo := opt.BackupPath + "/" + mType + "/" + takenAt.Format("2006/01/02") + "/" + mfBest.BaseName()
-			for fs.FileExists(backupTo) && fs.Hash(backupTo) != mfBest.Hash() {
-				log.Warnf("backup: same name but diff hash: %s ->%s", backupTo, mfBest.FileName())
-				backupTo = backupTo + "_" + mfBest.Hash()
-			}
-			log.Infof("backup: DO!!! [ %s => %s ], %s %s", mfBest.FileName(), backupTo, takenAt, src)
-			mfBest.Copy(backupTo)
-		}
+		log.Infof("backup: DO NOTHING for mf=%s, already existed in backup,fi=%s, backupTo=%s", fullPath, fb.Path, backupTo)
 	}
 
-	result.Status = IndexAdded
-	return result
+	log.Infof("backup: DONE mf=%s key=%s fiName=%s backupTo=%s %s %s, map=%v", fullPath, fb.ID, fb.Path, backupTo, takenAt, takenAtSrc, fb.Duplica)
+
 }
