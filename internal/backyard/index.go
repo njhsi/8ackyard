@@ -10,6 +10,7 @@ import (
 
 	"github.com/barasher/go-exiftool"
 	"github.com/karrick/godirwalk"
+	"github.com/timshannon/badgerhold/v4"
 
 	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/mutex"
@@ -19,16 +20,15 @@ import (
 // Index represents an indexer that indexes files in the originals directory.
 type Index struct {
 	//	convert *Convert
-	files  *Files
-	photos *Photos
+	files       *Files
+	storeBackup *badgerhold.Store
 }
 
 // NewIndex returns a new indexer and expects its dependencies as arguments.
 func NewIndex(files *Files, photos *Photos) *Index {
 
 	i := &Index{
-		files:  files,
-		photos: photos,
+		files: files,
 	}
 
 	return i
@@ -37,6 +37,25 @@ func NewIndex(files *Files, photos *Photos) *Index {
 // Cancel stops the current indexing operation.
 func (ind *Index) Cancel() {
 	mutex.MainWorker.Cancel()
+}
+
+func (ind *Index) initStoreBacup(storePath string) error {
+	options := badgerhold.DefaultOptions
+	options.Dir = storePath + "/backup.db"
+	options.ValueDir = storePath + "/backup.db"
+
+	store, err := badgerhold.Open(options)
+	if err != nil {
+		log.Errorf("index: initStoreBacup - db open failed %s", storePath)
+		return err
+	}
+	ind.storeBackup = store
+	fis := []FileBacked{} //TODO
+	if err := store.Find(&fis, nil); err != nil {
+		log.Errorf("index: initStoreBacup - find failed %s %v", storePath, err)
+	}
+	log.Infof("index: initStoreBacup - number of files in store %d", len(fis))
+	return nil
 }
 
 // Start indexes media files in the "originals" folder.
@@ -191,6 +210,19 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	// BACKUP to destine
 	if opt.BackupPath != "" {
+		if err := ind.initStoreBacup(opt.CachePath); err != nil {
+			log.Errorf("index: photos.Init failed %s", err)
+			return done
+		}
+		defer ind.storeBackup.Close()
+
+		backupOpt := BackupOptions{
+			OriginalsPath: opt.Path,
+			BackupPath:    opt.BackupPath,
+			CachePath:     opt.CachePath,
+			NumWorkers:    opt.NumWorkers,
+			Store:         ind.storeBackup,
+		}
 		jobs2 := make(chan BackupJob)
 		wg.Add(numWorkers)
 		for i := 0; i < numWorkers; i++ {
@@ -202,9 +234,9 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		for kFileSize, vMfiles := range ind.files.mfiles {
 			log.Infof("backup: size=%d, %d mfs", kFileSize, len(vMfiles))
 			jobs2 <- BackupJob{
-				IndexOpt: opt,
-				Ind:      ind,
-				MFiles:   vMfiles,
+				BackupOpt: backupOpt,
+				Ind:       ind,
+				MFiles:    vMfiles,
 			}
 		}
 		close(jobs2)

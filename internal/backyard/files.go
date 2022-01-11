@@ -20,7 +20,7 @@ type Files struct {
 	store  *badgerhold.Store
 }
 
-type FileInStore struct {
+type FileIndexed struct {
 	ID      string `badgerholdIndex:"ID"` //xxhash of file content
 	Hash    string `badgerhold:"unique"`
 	Size    int
@@ -51,21 +51,20 @@ func (m *Files) Init(storePath string) error {
 	}
 
 	options := badgerhold.DefaultOptions
-	options.Dir = storePath + "/db"
-	options.ValueDir = storePath + "/db"
+	options.Dir = storePath + "/indexed.db"
+	options.ValueDir = storePath + "/indexed.db"
 
 	store, err := badgerhold.Open(options)
 	if err != nil {
-		log.Errorf("bolt open failed %s", storePath)
+		log.Errorf("Files: init - db open failed %s", storePath)
 		return err
 	}
 	m.store = store
 
-	//	files, err := query.IndexedFiles()
-	files := make(FileMap)
-	fis := []FileInStore{}
+	files := make(FileMap) //TODO
+	fis := []FileIndexed{}
 	if err := store.Find(&fis, nil); err != nil {
-		log.Errorf("bolt find failed %s %v", storePath, err)
+		log.Errorf("files: init -  find failed %s %v", storePath, err)
 	}
 	log.Infof("files: init - number of files in store %d", len(fis))
 
@@ -99,7 +98,7 @@ func (m *Files) Remove(fileName, fileRoot string) {
 	defer m.mutex.Unlock()
 
 	delete(m.files, key)
-	m.store.DeleteMatching(&FileInStore{}, badgerhold.Where("Name").Eq(key))
+	m.store.DeleteMatching(&FileIndexed{}, badgerhold.Where("Name").Eq(key))
 }
 
 func (m *Files) Add(mf *MediaFile) {
@@ -116,7 +115,7 @@ func (m *Files) Add(mf *MediaFile) {
 
 	fullPath, mtime := mf.FileName(), mf.modTime.Unix()
 	takenAt, takenAtSrc := mf.TakenAt()
-	fi := FileInStore{
+	fi := FileIndexed{
 		ID:      mf.Hash(),
 		Name:    mf.BaseName(),
 		Size:    int(mf.FileSize()),

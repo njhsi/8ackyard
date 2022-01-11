@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
-	"time"
 
 	"github.com/barasher/go-exiftool"
 	"github.com/njhsi/8ackyard/internal/config"
-	"github.com/njhsi/8ackyard/pkg/fs"
 	"github.com/njhsi/8ackyard/pkg/sanitize"
 )
 
@@ -78,75 +76,5 @@ func index_main(fileName string, ind *Index, opt IndexOptions, exifTool *exiftoo
 
 	log.Infof("index: %s ma!n %s file %s %s.%s", result, f.FileType(), sanitize.Log(f.RelName(opt.Path)), takenAt, src)
 
-	return result
-}
-
-type BackupJob struct {
-	IndexOpt IndexOptions
-	Ind      *Index
-	MFiles   MediaFiles
-}
-
-func BackupWorker(jobs <-chan BackupJob) {
-	for job := range jobs {
-		log.Infof("BackupWorker:                           mfs=%d", len(job.MFiles))
-		backup_main(job.MFiles, job.Ind, job.IndexOpt)
-	}
-}
-
-func backup_main(mFiles MediaFiles, ind *Index, opt IndexOptions) (result IndexResult) {
-	sumMfiles := map[string]MediaFiles{}
-	if len(mFiles) == 1 { // no need to do hash
-		sumMfiles[""] = mFiles
-		log.Infof("backup: mf=%s size=%d  sha1=%s", mFiles[0].FileName(), mFiles[0].FileSize(), mFiles[0].Hash())
-	} else {
-		for _, mf := range mFiles {
-			sumMfiles[mf.Hash()] = append(sumMfiles[mf.Hash()], mf)
-			log.Infof("backup: mf=%s size=%d  sha1=%s", mf.FileName(), mf.FileSize(), mf.Hash())
-		}
-	}
-	for _, mfs := range sumMfiles { //TODO: job the vMfiles of each Hash
-		var mfBest *MediaFile = nil
-		for _, mf := range mfs {
-			//TODO: save dups info into a txt file, in case ..
-			takenAt, src := mf.TakenAt()
-			if src == "meta" {
-				mfBest = mf
-				break
-			} else {
-				if mfBest == nil {
-					mfBest = mf
-				} else {
-					takenAtBest, _ := mfBest.TakenAt()
-					if takenAt.Before(takenAtBest) {
-						mfBest = mf
-					}
-				}
-			}
-		}
-		//do!
-		if mfBest != nil {
-			loc, _ := time.LoadLocation("Asia/Chongqing")
-			takenAt, src := mfBest.TakenAt()
-			takenAt = takenAt.In(loc)
-			mType := "unknown"
-			if mfBest.IsPhoto() {
-				mType = "photo"
-			} else if mfBest.IsVideo() {
-				mType = "video"
-			} else if mfBest.IsAudio() {
-				mType = "audio"
-			}
-
-			backupTo := opt.BackupPath + "/" + mType + "/" + takenAt.Format("2006/01/02") + "/" + mfBest.BaseName()
-			for fs.FileExists(backupTo) {
-				backupTo = backupTo + "_8"
-			}
-			log.Infof("backup: DO!!! [ %s => %s ], %s %s", mfBest.FileName(), backupTo, takenAt, src)
-			mfBest.Copy(backupTo)
-		}
-	}
-
-	result.Status = IndexAdded
 	return result
 }
