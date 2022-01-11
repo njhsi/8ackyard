@@ -14,11 +14,11 @@ import (
 type FileIndexed struct {
 	ID       string `badgerholdIndex:"ID"` //xxhash of file content
 	Path     string //full path
-	TimeBorn int64
-	TimeSrc  string
+	TimeBorn int64  //unix seconds
+	TimeSrc  string //meta, name, auto
 	Size     int
 	Hash     string `badgerhold:"unique"`
-	Format   string
+	Format   string // extension etc..
 	Mime     string
 	Duplica  map[string]int64 //fullpath:modtime
 	Info     string

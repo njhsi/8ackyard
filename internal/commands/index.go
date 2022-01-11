@@ -13,6 +13,7 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/njhsi/8ackyard/internal/backyard"
+	"github.com/njhsi/8ackyard/internal/mutex"
 	"github.com/njhsi/8ackyard/internal/service"
 	"github.com/njhsi/8ackyard/pkg/fs"
 )
@@ -52,8 +53,10 @@ var indexFlags = []cli.Flag{
 	},
 }
 
-func handleContext() {
-	ctx, cancel := context.WithCancel(context.Background())
+// indexAction indexes all photos in originals directory (photo library)
+func indexAction(ctx *cli.Context) error {
+	// handle ctrl+c
+	contxt, cancel := context.WithCancel(context.Background())
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
 	defer func() {
@@ -63,18 +66,16 @@ func handleContext() {
 	go func() {
 		select {
 		case <-signalChan: // first signal, cancel context
-			cancel()
-		case <-ctx.Done():
+			mutex.MainWorker.Cancel()
+			//			cancel()
+		case <-contxt.Done():
 		}
 		<-signalChan // second signal, hard exit
 		os.Exit(2)
 	}()
-}
 
-// indexAction indexes all photos in originals directory (photo library)
-func indexAction(ctx *cli.Context) error {
+	// starting mainly
 	start := time.Now()
-	handleContext()
 
 	backupPath := ctx.String("backup")
 	cachePath := ctx.String("cache")

@@ -258,6 +258,9 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		ind.mutex.RLock()
 		defer ind.mutex.RUnlock()
 		ind.storeIndex.ForEach(nil, func(fi *FileIndexed) error {
+			if mutex.MainWorker.Canceled() {
+				return errors.New("backing canceled")
+			}
 			log.Infof("backup: key=%d, %d mfs", fi.ID, fi.Path)
 			jobs2 <- BackupJob{
 				BackupOpt: backupOpt,
@@ -272,5 +275,6 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		runtime.GC()
 	}
 
+	log.Infof("index: Start() finished.. mainworker canceld %v", mutex.MainWorker.Canceled())
 	return done
 }
