@@ -138,6 +138,7 @@ var FileExt = FileExtensions{
 	".mp3":  FormatMp3,
 	".m4a":  FormatM4a,
 	".wav":  FormatWav,
+	".amr":  FormatAmr,
 }
 
 func (m FileExtensions) Known(name string) bool {
@@ -217,23 +218,19 @@ func (t FileFormat) Find(fileName string, stripSequence bool) string {
 
 // GetFileFormat returns the (expected) type for a given file name.
 func GetFileFormat(fileName string) FileFormat {
-	fileExt := strings.ToLower(filepath.Ext(fileName))
-	result, ok := FileExt[fileExt]
-
-	if !ok {
-		result = FormatOther
+	var result, ok = FormatOther, false
+	if typ, err := filetype.MatchFile(fileName); err == nil {
+		result, ok = FileExt["."+typ.Extension]
+		if !ok {
+			result = FormatOther
+		}
+		//		println("GetFileFormat: filetype.MatchFile - ", typ.Extension, typ.MIME.Value, fileName, result)
 	}
 
-	// nj: try harder..
-	//ok = false
-	if !ok {
-		if typ, err := filetype.MatchFile(fileName); err == nil {
-			result, ok = FileExt["."+typ.Extension]
-			if !ok {
-				result = FormatOther
-			}
-			//			println("GetFileFormat:", typ.Extension, typ.MIME.Value, fileName, result)
-		}
+	if !ok || result == FormatOther {
+		fileExt := strings.ToLower(filepath.Ext(fileName))
+		result, ok = FileExt[fileExt]
+		//		println("GetFileFormat: by ext ", result, fileExt, fileName)
 	}
 
 	return result
