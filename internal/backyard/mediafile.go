@@ -236,18 +236,10 @@ func (m *MediaFile) CanonicalNameFromFileWithDirectory() string {
 	return m.Dir() + string(os.PathSeparator) + m.CanonicalNameFromFile()
 }
 
-func (m *MediaFile) Md5sum() string {
-	if len(m.md5sum) == 0 {
-		m.md5sum = fs.Md5sum(m.FileName())
-	}
-
-	return m.md5sum
-}
-
-// Hash returns the SHA1 hash of a media file.
+// Hash returns the XXH3 64bit hash of a media file.
 func (m *MediaFile) Hash() string {
 	if len(m.hash) == 0 {
-		m.hash = fs.Hash(m.FileName())
+		m.hash = fs.HashXXH3_64(m.FileName())
 	}
 
 	return m.hash
@@ -740,7 +732,7 @@ func (m *MediaFile) ToJson() (jsonName string, err error) {
 	return jsonName, err
 }
 
-//-------
+// -------
 // MediaFiles represents a slice of files.
 type MediaFiles []*MediaFile
 

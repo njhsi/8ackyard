@@ -25,6 +25,7 @@ require (
 	github.com/tidwall/gjson v1.12.1
 	github.com/timshannon/badgerhold/v4 v4.0.2
 	github.com/urfave/cli v1.22.5
+	github.com/zeebo/xxh3 v1.0.2
 	gopkg.in/photoprism/go-tz.v2 v2.1.1
 )
 
@@ -49,6 +50,7 @@ require (
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/compress v1.13.1 // indirect
+	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect

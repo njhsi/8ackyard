@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
 	"hash/crc32"
@@ -9,25 +8,10 @@ import (
 	"os"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/zeebo/xxh3"
 )
 
-func Md5sum(fileName string) string {
-	var result []byte
-	file, err := os.Open(fileName)
-	if err != nil {
-		return ""
-	}
-	defer file.Close()
-	md5sum := md5.New()
-	if _, err := io.Copy(md5sum, file); err != nil {
-		return ""
-	}
-
-	return hex.EncodeToString(md5sum.Sum(result))
-}
-
-// Hash returns the SHA1 hash of a file as string.
-func Sha1sum(fileName string) string {
+func HashXXH3_64(fileName string) string {
 	var result []byte
 
 	file, err := os.Open(fileName)
@@ -38,16 +22,28 @@ func Sha1sum(fileName string) string {
 
 	defer file.Close()
 
-	hash := sha1.New()
+	hash := xxh3.New()
 
 	if _, err := io.Copy(hash, file); err != nil {
 		return ""
 	}
 
-	return hex.EncodeToString(hash.Sum(result))
-}
+	s := hash.Sum64()
+	result = append(
+		result,
+		byte(s>>56),
+		byte(s>>48),
+		byte(s>>40),
+		byte(s>>32),
+		byte(s>>24),
+		byte(s>>16),
+		byte(s>>8),
+		byte(s),
+	)
 
-func Hash(fileName string) string {
+	return hex.EncodeToString(result)
+}
+func HashXXH2_64(fileName string) string {
 	var result []byte
 
 	file, err := os.Open(fileName)
@@ -65,7 +61,27 @@ func Hash(fileName string) string {
 	}
 
 	return hex.EncodeToString(hash.Sum(result))
+}
 
+// Hash returns the SHA1 hash of a file as string.
+func Hash_(fileName string) string {
+	var result []byte
+
+	file, err := os.Open(fileName)
+
+	if err != nil {
+		return ""
+	}
+
+	defer file.Close()
+
+	hash := sha1.New()
+
+	if _, err := io.Copy(hash, file); err != nil {
+		return ""
+	}
+
+	return hex.EncodeToString(hash.Sum(result))
 }
 
 // Checksum returns the CRC32 checksum of a file as string.

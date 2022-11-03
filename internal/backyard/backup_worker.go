@@ -50,9 +50,9 @@ func mainBackup(file *FileIndexed, store *badgerhold.Store, opt BackupOptions) {
 
 	backupTo := opt.BackupPath + "/" + mType + "/" + takenAt.Format("2006/01/02") + "/" + baseName
 	backupTo = path.Clean(backupTo)
-	for fs.FileExists(backupTo) && fs.Hash(backupTo) != hash {
+	for fs.FileExists(backupTo) && fs.HashXXH3_64(backupTo) != hash {
 		log.Warnf("backup: same name but diff hash: %s ->%s", backupTo, file.Path)
-		backupTo = backupTo + "_" + hash
+		backupTo = backupTo + "_" + hash + "XXH3"
 	}
 	log.Infof("backup: STARTing file=%s, %s -> %s , %s, %v(%s)", baseName, fullPath, backupTo, hash, takenAt, takenAtSrc)
 
@@ -90,12 +90,15 @@ func mainBackup(file *FileIndexed, store *badgerhold.Store, opt BackupOptions) {
 		// copy it
 		log.Infof("backup: DO COPY for mf=%s, -> %s , backupTo=%s", fullPath, fb.Path, backupTo)
 		fs.CopyWithStat(fullPath, fb.Path)
-	} else if fs.FileExists(fb.Path) == true && backupTo != fb.Path {
-		//link it
-		log.Infof("backup: DO LINK for mf=%s,(backupTo->fiName) %s -> %s", fullPath, backupTo, fb.Path)
-		os.Symlink(fb.Path, backupTo)
 	} else {
-		log.Infof("backup: DO NOTHING for mf=%s, already existed in backup,fi=%s, backupTo=%s", fullPath, fb.Path, backupTo)
+		if backupTo != fb.Path {
+			//link it
+			log.Infof("backup: DO LINK for mf=%s,(backupTo->fiName) %s -> %s", fullPath, backupTo, fb.Path)
+			os.Symlink(fb.Path, backupTo)
+
+		} else { //TODO: is it really the file we want?
+			log.Infof("backup: DO NOTHING for mf=%s, already existed in backup,fi=%s, backupTo=%s", fullPath, fb.Path, backupTo)
+		}
 	}
 
 	log.Infof("backup: DONE mf=%s key=%s fiName=%s backupTo=%s %s %s, map=%v", fullPath, fb.ID, fb.Path, backupTo, takenAt, takenAtSrc, fb.Duplica)
