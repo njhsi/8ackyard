@@ -1,9 +1,9 @@
 module github.com/njhsi/8ackyard
 
-go 1.17
+go 1.19
 
 require (
-	github.com/barasher/go-exiftool v1.7.0
+	github.com/barasher/go-exiftool v1.8.0
 	github.com/cespare/xxhash/v2 v2.1.2
 	github.com/djherbis/times v1.5.0
 	github.com/dsoprea/go-exif/v3 v3.0.0-20210625224831-a6301f85c82b
@@ -15,7 +15,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/gosimple/slug v1.12.0
 	github.com/h2non/filetype v1.1.3
-	github.com/karrick/godirwalk v1.16.1
+	github.com/karrick/godirwalk v1.17.0
 	github.com/leandro-lugaresi/hub v1.1.1
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/satori/go.uuid v1.2.0
@@ -61,6 +61,6 @@ require (
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v2 v2.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
 )

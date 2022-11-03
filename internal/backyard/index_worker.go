@@ -58,7 +58,7 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 
 	// Enforce file size limit for originals.
 	if sizeLimit > 0 && f.FileSize() > sizeLimit {
-		log.Errorf("index_main: %s (%d/%dM)", f.FileName(), f.FileSize()/(1024*1024), sizeLimit/(1024*1024))
+		log.Errorf("index_main: file size xx%s (%d/%dM)", f.FileName(), f.FileSize()/(1024*1024), sizeLimit/(1024*1024))
 		return nil
 	}
 
