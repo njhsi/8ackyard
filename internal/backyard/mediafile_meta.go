@@ -47,14 +47,14 @@ func (m *MediaFile) MetaData() (result meta.Data) {
 		if m.ExifSupported() {
 			err = m.metaData.Exif(m.FileName(), m.FileType())
 		} else {
-			err = fmt.Errorf("exif not supported")
+			err = fmt.Errorf("exif not supported!!")
 		}
 
 		// Parse regular JSON sidecar files ("img_1234.json")
 
 		if err != nil {
 			m.metaData.Error = err
-			log.Debugf("metadata: %s in %s", err, m.BaseName())
+			log.Debugf("metadata: %s in %s,  m.FileType=%v", err, m.FileName(), m.FileType())
 		}
 	})
 

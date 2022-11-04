@@ -109,7 +109,7 @@ func add(ind *Index, mf *MediaFile) {
 	info := "ukn"
 	switch {
 	case mf.IsPhoto():
-		info = "photo"
+		info = "image"
 	case mf.IsVideo():
 		info = "video"
 	case mf.IsAudio():

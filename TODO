@@ -1,4 +1,5 @@
 #TODO
+ - sqlite3
  - collect all files info(file path,hash,size,stat) into a txt file
  - non-media files index and backup:
    - sidecar: .AAE, 

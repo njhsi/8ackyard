@@ -569,7 +569,7 @@ func (m *MediaFile) IsSidecar() bool {
 
 // IsPlayableVideo returns true if this is a supported video file format.
 func (m *MediaFile) IsPlayableVideo() bool {
-	return m.IsVideo() && (m.HasFileType(fs.FormatMp4) || m.HasFileType(fs.FormatAvc))
+	return m.IsVideo() && (m.HasFileType(fs.FormatMp4) || m.HasFileType(fs.FormatAvc) || m.HasFileType(fs.FormatMov))
 }
 
 // IsPhoto returns true if this file is a photo / image.
@@ -579,7 +579,7 @@ func (m *MediaFile) IsPhoto() bool {
 
 // ExifSupported returns true if parsing exif metadata is supported for the media file type.
 func (m *MediaFile) ExifSupported() bool {
-	return m.IsJpeg() || m.IsRaw() || m.IsHEIF() || m.IsPng() || m.IsTiff()
+	return m.IsJpeg() || m.IsRaw() || m.IsHEIF() || m.IsPng() || m.IsTiff() || m.IsPlayableVideo()
 }
 
 // IsMedia returns true if this is a media file (photo or video, not sidecar or other).

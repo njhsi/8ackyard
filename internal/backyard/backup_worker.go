@@ -86,8 +86,25 @@ func mainBackup(file *FileIndexed, store *badgerhold.Store, opt BackupOptions) {
 		log.Errorf("backup: Insert error %v %s", err, fb.Path)
 	}
 
-	if fs.FileExists(fb.Path) == false {
-		// copy it
+	f_pathx := func(apath string) string {
+		// copy realted files like .AAE
+		related := apath
+		for i := len(apath) - 1; i >= 0 && apath[i] != '/'; i-- {
+			if apath[i] == '.' {
+				related = apath[:i]
+				break
+			}
+		}
+		return related
+	}
+	related := f_pathx(fullPath) + ".AAE"
+	related_ := f_pathx(fb.Path) + ".AAE"
+	if fs.FileExists(related) == true && fs.FileExists(related_) == false {
+		log.Infof("backup: DO COPY (realted) for mf=%s, -> %s , backupTo=%s", related, related_, backupTo)
+		fs.CopyWithStat(related, related_)
+	}
+
+	if fs.FileExists(fb.Path) == false { // copy it
 		log.Infof("backup: DO COPY for mf=%s, -> %s , backupTo=%s", fullPath, fb.Path, backupTo)
 		fs.CopyWithStat(fullPath, fb.Path)
 	} else {
