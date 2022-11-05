@@ -11,24 +11,8 @@ import (
 	"github.com/zeebo/xxh3"
 )
 
-func HashXXH3_64(fileName string) string {
+func Uint64ToString(s uint64) string {
 	var result []byte
-
-	file, err := os.Open(fileName)
-
-	if err != nil {
-		return ""
-	}
-
-	defer file.Close()
-
-	hash := xxh3.New()
-
-	if _, err := io.Copy(hash, file); err != nil {
-		return ""
-	}
-
-	s := hash.Sum64()
 	result = append(
 		result,
 		byte(s>>56),
@@ -42,6 +26,51 @@ func HashXXH3_64(fileName string) string {
 	)
 
 	return hex.EncodeToString(result)
+
+}
+
+func XXHash3_Str(fileName string) string {
+	s := XXHash3(fileName)
+	if s == 0 {
+		return ""
+	}
+	return Uint64ToString(s)
+}
+func XXHash3(fileName string) uint64 {
+	//	var result []byte
+
+	file, err := os.Open(fileName)
+
+	if err != nil {
+		//		return ""
+		return 0
+	}
+
+	defer file.Close()
+
+	hash := xxh3.New()
+
+	if _, err := io.Copy(hash, file); err != nil {
+		//		return ""
+		return 0
+	}
+
+	s := hash.Sum64()
+	return s
+	/*	result = append(
+			result,
+			byte(s>>56),
+			byte(s>>48),
+			byte(s>>40),
+			byte(s>>32),
+			byte(s>>24),
+			byte(s>>16),
+			byte(s>>8),
+			byte(s),
+		)
+
+		return hex.EncodeToString(result)
+	*/
 }
 func HashXXH2_64(fileName string) string {
 	var result []byte

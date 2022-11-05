@@ -23,46 +23,33 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.6.1
 	github.com/tidwall/gjson v1.12.1
-	github.com/timshannon/badgerhold/v4 v4.0.2
 	github.com/urfave/cli v1.22.5
 	github.com/zeebo/xxh3 v1.0.2
 	gopkg.in/photoprism/go-tz.v2 v2.1.1
 )
 
 require (
-	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dgraph-io/badger/v3 v3.2103.1 // indirect
-	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dsoprea/go-iptc v0.0.0-20200609062250-162ae6b44feb // indirect
 	github.com/dsoprea/go-photoshop-info-format v0.0.0-20200609050348-3db9b63b202c // indirect
 	github.com/dsoprea/go-utility/v2 v2.0.0-20200717064901-2fccff4aa15e // indirect
 	github.com/go-errors/errors v1.1.1 // indirect
 	github.com/go-xmlfmt/xmlfmt v0.0.0-20191208150333-d5b6f63a941b // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/geo v0.0.0-20200319012246-673a6f80352d // indirect
-	github.com/golang/glog v0.0.0-20210429001901-424d2337a529 // indirect
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/flatbuffers v2.0.0+incompatible // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
-	github.com/klauspost/compress v1.13.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
+	github.com/mattn/go-sqlite3 v1.14.16 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	go.opencensus.io v0.23.0 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/image v0.0.0-20200618115811-c13761719519 // indirect
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
-	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
 )

@@ -1,16 +1,20 @@
 package backyard
 
 import (
+	"database/sql"
 	"errors"
+	iofs "io/fs"
+	"os"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
 
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/barasher/go-exiftool"
 	"github.com/karrick/godirwalk"
-	"github.com/timshannon/badgerhold/v4"
 
 	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/mutex"
@@ -20,9 +24,8 @@ import (
 // Index represents an indexer that indexes files in the originals directory.
 type Index struct {
 	//	convert *Convert
-	mutex       sync.RWMutex // storeIndex
-	storeIndex  *badgerhold.Store
-	storeBackup *badgerhold.Store
+	mutex sync.RWMutex // storeIndex
+
 }
 
 // NewIndex returns a new indexer and expects its dependencies as arguments.
@@ -39,44 +42,11 @@ func (ind *Index) Cancel() {
 }
 
 func (ind *Index) initStoreIndex(storePath string) error {
-	options := badgerhold.DefaultOptions
-	options.Dir = storePath + "/indexed.db"
-	options.ValueDir = storePath + "/indexed.db"
-
-	store, err := badgerhold.Open(options)
-	if err != nil {
-		log.Errorf("initStoreIndex: Open - db open failed %s", storePath)
-		return err
-	}
-
-	ind.storeIndex = store
-
-	fis := []FileIndexed{}
-	if err := store.Find(&fis, nil); err != nil {
-		log.Errorf("initStoreIndex: Find -  find failed %s %v", storePath, err)
-		return err
-	}
-	log.Infof("initStoreIndex:  number of files in store %d", len(fis))
 
 	return nil
 }
 
 func (ind *Index) initStoreBacup(storePath string) error {
-	options := badgerhold.DefaultOptions
-	options.Dir = storePath + "/backup.db"
-	options.ValueDir = storePath + "/backup.db"
-
-	store, err := badgerhold.Open(options)
-	if err != nil {
-		log.Errorf("index: initStoreBacup - db open failed %s", storePath)
-		return err
-	}
-	ind.storeBackup = store
-	fis := []FileBacked{} //TODO
-	if err := store.Find(&fis, nil); err != nil {
-		log.Errorf("index: initStoreBacup - find failed %s %v", storePath, err)
-	}
-	log.Infof("index: initStoreBacup - number of files in store %d", len(fis))
 	return nil
 }
 
@@ -98,11 +68,30 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		return done
 	}
 
-	if err := ind.initStoreIndex(opt.CachePath); err != nil {
-		log.Errorf("index: ind.initStoreIndex failed %s", err)
+	dbName := opt.CachePath + "/indexed.db"
+	dbExisted := true
+	if _, err := os.Stat(dbName); errors.Is(err, iofs.ErrNotExist) {
+		dbExisted = false
+	}
+	db, err := sql.Open("sqlite3", dbName)
+	if err != nil {
+		log.Errorf("db failed: Open %v", err)
 		return done
 	}
-	defer ind.storeIndex.Close()
+	defer db.Close()
+	if !dbExisted {
+		sqlStmt := `
+               create table file (idxxh3 integer not null primary key, size integer not null, birth integer, type text, name text);
+               create table path (path text not null primary key, idxxh3 integer not null, mtime integer);
+               delete from file;
+               delete from path;
+               `
+		_, err = db.Exec(sqlStmt)
+		if err != nil {
+			log.Errorf("db failed: Exec %q: %s", err, sqlStmt)
+			return done
+		}
+	}
 
 	if err := mutex.MainWorker.Start(); err != nil {
 		log.Errorf("index: %s", err.Error())
@@ -112,12 +101,13 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	defer mutex.MainWorker.Stop()
 
 	jobs := make(chan IndexJob)
+	chDb := make(chan *FileIndexed, 50)
 
 	// Start a fixed number of goroutines to index files.
 	var wg sync.WaitGroup
 	var numWorkers = opt.NumWorkers
 	if numWorkers == 0 {
-		numWorkers = 4
+		numWorkers = 3
 	}
 	wg.Add(numWorkers)
 	for i := 0; i < numWorkers; i++ {
@@ -134,6 +124,38 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		}()
 
 	}
+	chDbWait := make(chan bool)
+	go func() {
+		//db
+		var fcount int
+		var dbtx *sql.Tx
+		var stmt *sql.Stmt
+
+		for fi := range chDb {
+			log.Infof("index db:%v, fi:%v, fcount:%v", db, fi, fcount)
+
+			if fcount == 0 {
+				dbtx, _ = db.Begin()
+				stmt, _ = dbtx.Prepare("insert into path(path, idxxh3, mtime) values(?, ?, ?)")
+			}
+			fcount = fcount + 1
+			if _, errx := stmt.Exec(fi.Path, int64(fi.ID), fi.TimeSrc); errx != nil {
+				log.Warn(errx)
+			}
+			if fcount == 100 {
+				fcount = 0
+				dbtx.Commit()
+				stmt.Close()
+			}
+		}
+
+		if fcount > 0 {
+			dbtx.Commit()
+			stmt.Close()
+		}
+		log.Infof("index db: exit %v", db)
+		chDbWait <- true
+	}()
 
 	config.CacheDir = opt.CachePath
 	config.FileRoot = opt.Path
@@ -149,7 +171,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		log.Infof(`index: ignored "%s"`, fs.RelName(fileName, originalsPath))
 	}
 
-	err := godirwalk.Walk(optionsPath, &godirwalk.Options{
+	err = godirwalk.Walk(optionsPath, &godirwalk.Options{
 		ErrorCallback: func(fileName string, err error) godirwalk.ErrorAction {
 			log.Errorf("index: %s", strings.Replace(err.Error(), originalsPath, "", 1))
 			return godirwalk.SkipNode
@@ -204,6 +226,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 				FileName: mf.FileName(),
 				IndexOpt: opt,
 				Ind:      ind,
+				ChDB:     chDb,
 			}
 
 			return nil
@@ -213,7 +236,10 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	})
 
 	close(jobs)
+
 	wg.Wait()
+	close(chDb)
+	<-chDbWait
 	log.Infof("index completed .. wg.Wait done")
 
 	if err != nil {
@@ -237,16 +263,19 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			log.Errorf("index: ind.initStoreBacup failed %s", err)
 			return done
 		}
-		defer ind.storeBackup.Close()
 
 		backupOpt := BackupOptions{
 			OriginalsPath: opt.Path,
 			BackupPath:    opt.BackupPath,
 			CachePath:     opt.CachePath,
 			NumWorkers:    opt.NumWorkers,
-			Store:         ind.storeBackup,
+			//			Store:         ind.storeBackup,
 		}
+		log.Infof(backupOpt.BackupPath)
+
 		jobs2 := make(chan BackupJob)
+		chDb2 := make(chan *FileBacked, 50)
+
 		wg.Add(numWorkers)
 		for i := 0; i < numWorkers; i++ {
 			go func() {
@@ -254,24 +283,42 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 				wg.Done()
 			}()
 		}
+		go func() {
+			//db
+			var fcount int
+			var dbtx *sql.Tx
+			var stmt *sql.Stmt
+			for fb := range chDb2 {
+				if fcount == 0 {
+					dbtx, _ = db.Begin()
+					stmt, _ = dbtx.Prepare("insert into file(idxxh3,  size, birth, type, name) values(?, ?, ?, ?, ?, ?)")
+				}
+				fcount = fcount + 1
+
+				if _, errx := stmt.Exec(fb); errx != nil {
+					log.Fatal(errx)
+				}
+				if fcount == 100 {
+					fcount = 0
+					dbtx.Commit()
+					stmt.Close()
+				}
+			}
+			if fcount > 0 {
+				dbtx.Commit()
+				stmt.Close()
+			}
+			chDbWait <- true
+		}()
 
 		ind.mutex.RLock()
 		defer ind.mutex.RUnlock()
-		ind.storeIndex.ForEach(nil, func(fi *FileIndexed) error {
-			if mutex.MainWorker.Canceled() {
-				return errors.New("backing canceled")
-			}
-			log.Infof("backup: key=%d, %d mfs", fi.ID, fi.Path)
-			jobs2 <- BackupJob{
-				BackupOpt: backupOpt,
-				Store:     ind.storeBackup,
-				File:      fi,
-			}
-			return nil
-		})
 
 		close(jobs2)
 		wg.Wait()
+		close(chDb2)
+		<-chDbWait
+
 		runtime.GC()
 	}
 

@@ -35,7 +35,7 @@ type MediaFile struct {
 	mimeType     string
 	takenAt      time.Time
 	takenAtSrc   string
-	hash         string
+	hash         uint64
 	checksum     string
 	md5sum       string
 	hasJpeg      bool
@@ -237,12 +237,15 @@ func (m *MediaFile) CanonicalNameFromFileWithDirectory() string {
 }
 
 // Hash returns the XXH3 64bit hash of a media file.
-func (m *MediaFile) Hash() string {
-	if len(m.hash) == 0 {
-		m.hash = fs.HashXXH3_64(m.FileName())
+func (m *MediaFile) Hash() uint64 {
+	if m.hash == 0 {
+		m.hash = fs.XXHash3(m.FileName())
 	}
 
 	return m.hash
+}
+func (m *MediaFile) HashStr() string {
+	return fs.Uint64ToString(m.Hash())
 }
 
 // Checksum returns the CRC32 checksum of a media file.

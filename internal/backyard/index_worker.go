@@ -8,16 +8,14 @@ import (
 	"github.com/barasher/go-exiftool"
 	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/pkg/sanitize"
-	"github.com/timshannon/badgerhold/v4"
 )
 
 type FileIndexed struct {
-	ID       string `badgerholdIndex:"ID"` //xxhash of file content
+	ID       uint64 //xxh3 of file content
 	Path     string //full path
 	TimeBorn int64  //unix seconds
 	TimeSrc  string //meta, name, auto
-	Size     int
-	Hash     string `badgerhold:"unique"`
+	Size     uint64
 	Format   string // extension etc..
 	Mime     string
 	Duplica  map[string]int64 //fullpath:modtime
@@ -38,28 +36,34 @@ type IndexJob struct {
 	FileName string
 	IndexOpt IndexOptions
 	Ind      *Index
+	ChDB     chan *FileIndexed
 }
 
 func IndexWorker(jobs <-chan IndexJob, et *exiftool.Exiftool) {
 	for job := range jobs {
 		log.Infof("IndexWorker:                           fileName=%s", job.FileName)
-		mainIndex(job.FileName, job.Ind, job.IndexOpt, et)
+		if _, mf := mainIndex(job.FileName, job.Ind, job.IndexOpt, et); mf != nil {
+			add(job.ChDB, mf)
+		}
 	}
 }
 
-func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool.Exiftool) error {
+func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool.Exiftool) (error, *MediaFile) {
+	log.Infof("mainIndex: entering, %v , %v", fileName, exifTool)
+	//	return nil, nil
 	f, err := NewMediaFile(fileName)
 	if err != nil {
 		log.Errorf("index_main: found no  mediafile for %s", sanitize.Log(fileName))
-		return err
+		return err, nil
 	}
 
 	sizeLimit := config.OriginalsLimit()
+	log.Infof("mainIndex: entering 1, %v , %v", fileName, exifTool)
 
 	// Enforce file size limit for originals.
 	if sizeLimit > 0 && f.FileSize() > sizeLimit {
 		log.Errorf("index_main: file size xx%s (%d/%dM)", f.FileName(), f.FileSize()/(1024*1024), sizeLimit/(1024*1024))
-		return nil
+		return nil, nil
 	}
 
 	if exifTool != nil && f.NeedsExifToolJson() {
@@ -92,18 +96,13 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 
 	//	result = ind.MediaFile(f, opt, "")
 	takenAt, src := f.TakenAt()
-	add(ind, f)
 
 	log.Infof("index_main: DONE mf=%s(%), %s %s.%s", f.FileName(), f.FileType(), f.Hash(), takenAt, src)
 
-	return nil
+	return nil, f
 }
 
-func add(ind *Index, mf *MediaFile) {
-	ind.mutex.Lock()
-	defer ind.mutex.Unlock()
-
-	store := ind.storeIndex
+func add(chDb chan *FileIndexed, mf *MediaFile) {
 	fullPath, mtime := mf.FileName(), mf.modTime.Unix()
 	takenAt, takenAtSrc := mf.TakenAt()
 	info := "ukn"
@@ -116,35 +115,19 @@ func add(ind *Index, mf *MediaFile) {
 		info = "audio"
 	}
 
-	fi := FileIndexed{
+	fi := &FileIndexed{
 		ID:       mf.Hash(),
 		Path:     mf.FileName(),
 		TimeBorn: takenAt.Unix(),
 		TimeSrc:  takenAtSrc,
-		Size:     int(mf.FileSize()),
-		Hash:     mf.Hash(),
+		Size:     uint64(mf.FileSize()),
 		Format:   string(mf.FileType()),
 		Mime:     mf.MimeType(),
 		Duplica:  map[string]int64{fullPath: mtime},
 		Info:     info,
 	}
 
-	err := store.Insert(fi.ID, &fi)
-	if err == badgerhold.ErrKeyExists {
-		log.Infof("index: - add - Insert key=%s existed for %s, updating ..", fi.ID, fullPath)
-		if err = store.FindOne(&fi, badgerhold.Where("ID").Eq(mf.Hash())); err == nil {
-			mtime2, bExisted := fi.Duplica[fullPath]
-			if bExisted == true && mtime != mtime2 {
-				//TODO: choose a better one to update?
-				log.Warnf("index: - add - Insert file=%s existed. time %v-> %v", fullPath, mtime, mtime2)
-			}
-			if bExisted == false || mtime < mtime2 {
-				fi.Duplica[fullPath] = mf.ModTime().Unix()
-				store.Update(fi.ID, &fi)
-			}
-		}
-	} else if err != nil {
-		log.Errorf("index: - add - Insert error %v %s", err, fi.Path)
-	}
+	chDb <- fi
+
 	log.Infof("index: - add - DONE %s %s %s %s, paths=%v", fi.ID, fi.Path, takenAt, takenAtSrc, fi.Duplica)
 }

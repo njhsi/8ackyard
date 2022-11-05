@@ -10,7 +10,7 @@ import (
 // ExifToolJsonName returns the cached ExifTool metadata file name.
 func (m *MediaFile) ExifToolJsonName() (string, error) {
 
-	return CacheName(m.Hash(), "json", "exiftool.json")
+	return CacheName(m.HashStr(), "json", "exiftool.json")
 }
 
 // NeedsExifToolJson tests if an ExifTool JSON file needs to be created.
