@@ -139,7 +139,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 				stmt, _ = dbtx.Prepare("insert into path(path, idxxh3, mtime) values(?, ?, ?)")
 			}
 			fcount = fcount + 1
-			if _, errx := stmt.Exec(fi.Path, int64(fi.ID), fi.TimeBornSrc); errx != nil {
+			if _, errx := stmt.Exec(fi.Path, int64(fi.ID), fi.TimeBorn); errx != nil {
 				log.Warn(errx)
 			}
 			if fcount == 100 {

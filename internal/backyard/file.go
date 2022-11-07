@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/barasher/go-exiftool"
 	"github.com/h2non/filetype"
-	"github.com/njhsi/8ackyard/pkg/fs"
 	"github.com/zeebo/xxh3"
 )
 
@@ -29,9 +27,9 @@ type FileIndexed struct {
 	ID    uint64 //xxh3 of file content
 	Path  string //full path
 	Size  int64
-	Mtime int64 //mod time
+	Mtime time.Time //mod time
 
-	TimeBorn    int64           //unix seconds
+	TimeBorn    time.Time       //to be save in db as unix seconds
 	TimeBornSrc TimeBornSrcType //meta, name, auto
 	Format      string          // extension etc..
 	Mime        string
@@ -78,12 +76,17 @@ func NewFileIndex(fileName string) (error, *FileIndexed) {
 		return err, nil
 	}
 
+	birthF, birthSrcF := guestTimeBorn(fileName), TimeBornSrcName
+	if birthF.Year() < 1900 || mtimeF.Before(birthF) {
+		birthF, birthSrcF = mtimeF, TimeBornSrcStat
+	}
+
 	fi := &FileIndexed{
 		Path:        fileName,
 		Size:        sizeF,
-		Mtime:       mtimeF.Unix(),
-		TimeBorn:    mtimeF.Unix(),
-		TimeBornSrc: TimeBornSrcStat,
+		Mtime:       mtimeF,
+		TimeBorn:    birthF,
+		TimeBornSrc: birthSrcF,
 	}
 
 	file, err := os.Open(fileName)
@@ -160,47 +163,11 @@ func buildExifJson(fileName string, et *exiftool.Exiftool) ([]byte, error) {
 	return result, err
 }
 
-func (f *FileIndexed) TryExif(exifTool *exiftool.Exiftool) string {
-	ids := Uint64ToString(f.ID)
-	exifJson, err := CacheName(ids, "json", "exiftool.json")
-	if err != nil {
-		return ""
+func guestTimeBorn(fileName string) time.Time {
+	//try name
+	tname, tbase := TimeFromFileName(fileName), TimeFromFileName(filepath.Base(fileName))
+	if tbase.Year() > 1980 && tbase.Before(tname) {
+		tname = tbase
 	}
-
-	if !fs.FileExists(exifJson) {
-		fileInfos := exifTool.ExtractMetadata(f.Path)
-		for _, fileInfo := range fileInfos {
-			if fileInfo.Err != nil {
-				log.Errorf("TryExif: Error in exiftool %v: %v\n", fileInfo.File, fileInfo.Err)
-				continue
-			}
-
-			jsonFile, err := json.MarshalIndent(fileInfo.Fields, "", "")
-			if err == nil {
-				ioutil.WriteFile(exifJson, jsonFile, 0644)
-			} else {
-				log.Errorf("TryExif: json.MarshalIndent err %v, %v", err, f)
-
-			}
-
-		}
-
-	}
-
-	if fs.FileExists(exifJson) {
-		exifExtracted := exifTool.ExtractMetadata(exifJson) //exif supported: JPEG, RAW, HEIF, PNG, TIFF
-		for _, info := range exifExtracted {
-			if info.Err != nil {
-				log.Errorf("TryExif: exifTool.ExtractMetadata %v %v", exifJson, info.Err)
-				continue
-			}
-			json, _ := json.MarshalIndent(info.Fields, "", "")
-			data := &ExifData{}
-			data.DataFromExiftool(json)
-
-		}
-
-	}
-
-	return ""
+	return tname
 }
