@@ -3,6 +3,7 @@ package backyard
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -16,18 +17,26 @@ import (
 	"github.com/zeebo/xxh3"
 )
 
+type TimeBornSrcType string
+
+const (
+	TimeBornSrcMeta TimeBornSrcType = "meta"
+	TimeBornSrcStat TimeBornSrcType = "stat"
+	TimeBornSrcName TimeBornSrcType = "name"
+)
+
 type FileIndexed struct {
 	ID    uint64 //xxh3 of file content
 	Path  string //full path
 	Size  int64
-	Mtime time.Time
+	Mtime int64 //mod time
 
-	TimeBorn int64  //unix seconds
-	TimeSrc  string //meta, name, auto
-	Format   string // extension etc..
-	Mime     string
-	Duplica  map[string]int64 //fullpath:modtime
-	Info     string
+	TimeBorn    int64           //unix seconds
+	TimeBornSrc TimeBornSrcType //meta, name, auto
+	Format      string          // extension etc..
+	Mime        string
+	Duplica     map[string]int64 //fullpath:modtime
+	Info        string
 }
 
 func fileStat(fileName string) (error, time.Time, int64) {
@@ -70,9 +79,11 @@ func NewFileIndex(fileName string) (error, *FileIndexed) {
 	}
 
 	fi := &FileIndexed{
-		Path:  fileName,
-		Size:  sizeF,
-		Mtime: mtimeF,
+		Path:        fileName,
+		Size:        sizeF,
+		Mtime:       mtimeF.Unix(),
+		TimeBorn:    mtimeF.Unix(),
+		TimeBornSrc: TimeBornSrcStat,
 	}
 
 	file, err := os.Open(fileName)
@@ -131,6 +142,22 @@ func Uint64ToString(s uint64) string {
 
 	return hex.EncodeToString(result)
 
+}
+
+func buildExifJson(fileName string, et *exiftool.Exiftool) ([]byte, error) {
+	err := errors.New("buildExifJson: non exif existed in " + fileName)
+	var result []byte
+	fileInfos := et.ExtractMetadata(fileName)
+	for _, fileInfo := range fileInfos {
+		if fileInfo.Err != nil {
+			log.Errorf("buildExifJson: Error in exiftool %v: %v\n", fileInfo.File, fileInfo.Err)
+			continue
+		}
+
+		result, err = json.MarshalIndent(fileInfo.Fields, "", "")
+		log.Infof("buildExifJson: got exif - %v , err=%v", fileInfo.File, err)
+	}
+	return result, err
 }
 
 func (f *FileIndexed) TryExif(exifTool *exiftool.Exiftool) string {

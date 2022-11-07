@@ -44,7 +44,7 @@ func mainBackup(file *FileIndexed, opt BackupOptions) *FileBacked {
 	timeLoc, _ := time.LoadLocation("Asia/Chongqing")
 
 	baseName, fullPath, mType, hash := path.Base(file.Path), file.Path, file.Info, file.ID
-	takenAt, takenAtSrc := time.Unix(file.TimeBorn, 0).In(timeLoc), file.TimeSrc
+	takenAt, takenAtSrc := time.Unix(file.TimeBorn, 0).In(timeLoc), file.TimeBornSrc
 	mtime := fs.BirthTime(fullPath).Unix() //TODO: birthtime not works?
 
 	backupTo := opt.BackupPath + "/" + mType + "/" + takenAt.Format("2006/01/02") + "/" + baseName

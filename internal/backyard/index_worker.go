@@ -1,6 +1,8 @@
 package backyard
 
 import (
+	"io/ioutil"
+
 	"github.com/barasher/go-exiftool"
 	"github.com/njhsi/8ackyard/internal/config"
 )
@@ -42,7 +44,20 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 		return
 	}
 
-	fi.TryExif(exifTool)
+	if jbuf, err := buildExifJson(fileName, exifTool); err == nil {
+		exif := &ExifData{}
+		if err := exif.DataFromExiftool(jbuf); err != nil {
+			log.Errorf("mainIndex: DataFromExiftool $v - %v", fileName, err)
+			//			return
+		} else {
+			log.Infof("mainIndex: exif(%v) -  %v", fileName, exif)
+			fi.TimeBorn, fi.TimeBornSrc = exif.TakenAt.Unix(), TimeBornSrcMeta
+			ids := Uint64ToString(fi.ID)
+			if exifJson, err := CacheName(ids, "json", "exiftool.json"); err == nil {
+				ioutil.WriteFile(exifJson, jbuf, 0644)
+			}
+		}
+	}
 
 	//	result = ind.MediaFile(f, opt, "")
 	//	takenAt, src := f.TakenAt()

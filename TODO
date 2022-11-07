@@ -6,6 +6,7 @@
  - verify backup'd file integrity: check hash with original
  - cleanup files with name like "_xxxxx" md5sum, prefer the simple name
  - ? preserve info of the folders containing photos: context, time, place, situation, persons..
+ - timezone of a file with no tzone in meta should be explicitly CHINA, not UTC, for example, 11mike.m4a
 
 #DOING
 
