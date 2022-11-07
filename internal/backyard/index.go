@@ -199,31 +199,8 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 			done[fileName] = fs.Found
 
-			if !fs.IsMedia(fileName) {
-				log.Infof("index: not media file /%s", fileName)
-				return nil
-			}
-
-			mf, err := NewMediaFile(fileName)
-
-			if err != nil {
-				log.Error(err)
-				return nil
-			}
-
-			if mf.FileSize() == 0 {
-				log.Infof("index: skipped empty file %s", mf.BaseName())
-				return nil
-			}
-
-			//			if ind.files.Indexed(relName, "/", mf.modTime, opt.Rescan) {
-			//				return nil
-			//			}
-
-			done[fileName] = fs.Processed
-
 			jobs <- IndexJob{
-				FileName: mf.FileName(),
+				FileName: fileName,
 				IndexOpt: opt,
 				Ind:      ind,
 				ChDB:     chDb,

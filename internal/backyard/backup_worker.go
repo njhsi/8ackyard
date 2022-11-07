@@ -10,7 +10,7 @@ import (
 
 type FileBacked struct {
 	ID      uint64           //xxh3 hash of file content
-	Size    uint64           // file size
+	Size    int64            // file size
 	Path    string           //full path, regular file existed on device
 	Duplica map[string]int64 //fullpath:modtime
 	Type    string
@@ -49,9 +49,9 @@ func mainBackup(file *FileIndexed, opt BackupOptions) *FileBacked {
 
 	backupTo := opt.BackupPath + "/" + mType + "/" + takenAt.Format("2006/01/02") + "/" + baseName
 	backupTo = path.Clean(backupTo)
-	for fs.FileExists(backupTo) && fs.XXHash3(backupTo) != hash {
+	for fs.FileExists(backupTo) && fileXXH3(backupTo) != hash {
 		log.Warnf("backup: same name but diff hash: %s ->%s", backupTo, file.Path)
-		backupTo = backupTo + "_" + fs.Uint64ToString(hash) + "_XXH3"
+		backupTo = backupTo + "_" + Uint64ToString(hash) + "_XXH3"
 	}
 	log.Infof("backup: STARTing file=%s, %s -> %s , %s, %v(%s)", baseName, fullPath, backupTo, hash, takenAt, takenAtSrc)
 
