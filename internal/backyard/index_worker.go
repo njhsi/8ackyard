@@ -43,7 +43,7 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 
 	err, fi := NewFileIndex(fileName)
 	if err != nil || fi == nil || fi.Size <= 0 || fi.Size > sizeLimit {
-		log.Errorf("mainIndex: NewFileIndex - wrong of file size of  err=%v, fi=%v", err, fi)
+		log.Errorf("mainIndex: NewFileIndex - wrong of file size of %v,  err=%v, fi=%v", fileName, err, fi)
 		return
 	}
 

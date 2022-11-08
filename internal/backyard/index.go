@@ -173,7 +173,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	err = godirwalk.Walk(optionsPath, &godirwalk.Options{
 		ErrorCallback: func(fileName string, err error) godirwalk.ErrorAction {
-			log.Errorf("index: %s", strings.Replace(err.Error(), originalsPath, "", 1))
+			log.Errorf("index: Walk an error=%s, @%v ", err, strings.Replace(err.Error(), originalsPath, "", 1))
 			return godirwalk.SkipNode
 		},
 		Callback: func(fileName string, info *godirwalk.Dirent) error {
@@ -198,7 +198,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			}
 
 			done[fileName] = fs.Found
-
+			log.Infof("index: Walk got file - %v", fileName)
 			jobs <- IndexJob{
 				FileName: fileName,
 				IndexOpt: opt,

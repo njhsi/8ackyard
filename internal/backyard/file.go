@@ -68,10 +68,12 @@ func NewFileIndex(fileName string) (error, *FileIndexed) {
 		return err, nil
 	}
 
+	timeLoc, _ := time.LoadLocation("Asia/Chongqing")
 	birthF, birthSrcF := guestTimeBorn(fileName), TimeBornSrcName
 	if birthF.Year() < 1900 || mtimeF.Before(birthF) {
 		birthF, birthSrcF = mtimeF, TimeBornSrcStat
 	}
+	time.Unix(birthF.Unix(), 0).In(timeLoc)
 
 	hostname, err := os.Hostname()
 
