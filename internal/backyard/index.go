@@ -46,10 +46,6 @@ func (ind *Index) initStoreIndex(storePath string) error {
 	return nil
 }
 
-func (ind *Index) initStoreBacup(storePath string) error {
-	return nil
-}
-
 // Start indexes media files in the "originals" folder.
 func (ind *Index) Start(opt IndexOptions) fs.Done {
 	defer func() {
@@ -80,11 +76,12 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	}
 	defer db.Close()
 	if !dbExisted {
+		// id: xxhash h3 64bit
 		sqlStmt := `
-               create table file (idxxh3 integer not null primary key, size integer not null, birth integer, type text, name text);
-               create table path (path text not null primary key, idxxh3 integer not null, mtime integer);
-               delete from file;
-               delete from path;
+               create table filez (id integer not null primary key, size integer not null, birth integer, type text, name text);
+               create table files (path text not null primary key, id integer not null, size integer not null, hostname text, timemodified integer, timeborn integer, timebornsrc text, mimetype text, mimesubtype text, info text);
+               delete from filez;
+               delete from files;
                `
 		_, err = db.Exec(sqlStmt)
 		if err != nil {
@@ -136,10 +133,13 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 			if fcount == 0 {
 				dbtx, _ = db.Begin()
-				stmt, _ = dbtx.Prepare("insert into path(path, idxxh3, mtime) values(?, ?, ?)")
+				//path text not null primary key, id integer not null, size integer not null, timemodified integer, hostname text, timeborn integer, timebornsrc text, mimetype text, mimesubtype text, info text
+				stmt, _ = dbtx.Prepare("insert into files(path, id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 			}
 			fcount = fcount + 1
-			if _, errx := stmt.Exec(fi.Path, int64(fi.ID), fi.TimeBorn); errx != nil {
+			if _, errx := stmt.Exec(fi.Path, int64(fi.ID), fi.Size, fi.Hostname,
+				fi.Mtime.Unix(), fi.TimeBorn.Unix(), fi.TimeBornSrc,
+				fi.MIMEType, fi.MIMESubtype, fi.Info); errx != nil {
 				log.Warn(errx)
 			}
 			if fcount == 100 {
@@ -236,10 +236,6 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	// BACKUP to destine
 	if opt.BackupPath != "" {
-		if err := ind.initStoreBacup(opt.CachePath); err != nil {
-			log.Errorf("index: ind.initStoreBacup failed %s", err)
-			return done
-		}
 
 		backupOpt := BackupOptions{
 			OriginalsPath: opt.Path,

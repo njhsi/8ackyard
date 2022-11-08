@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/barasher/go-exiftool"
@@ -24,14 +23,16 @@ const (
 )
 
 type FileIndexed struct {
-	ID    uint64 //xxh3 of file content
-	Path  string //full path
-	Size  int64
-	Mtime time.Time //mod time
+	ID       uint64 //xxh3 of file content
+	Path     string //full path
+	Size     int64
+	Hostname string    //uname of the machine
+	Mtime    time.Time //mod time
 
 	TimeBorn    time.Time        //to be save in db as unix seconds
 	TimeBornSrc TimeBornSrcType  //meta, name, auto
-	MIME        string           // xxx/yyy
+	MIMEType    string           // xxx of xxx/yyy
+	MIMESubtype string           // yyy of xxxy/yyy
 	Duplica     map[string]int64 //fullpath:modtime
 	Info        string
 }
@@ -44,14 +45,6 @@ func fileStat(fileName string) (error, time.Time, int64) {
 
 	return nil, s.ModTime().Round(time.Second), s.Size()
 
-}
-
-func fileMime(fileName string) string {
-	ext := strings.ToLower(filepath.Ext(fileName))
-	if typ, err := filetype.MatchFile(fileName); err == nil {
-		ext = typ.MIME.Value
-	}
-	return ext
 }
 
 func fileXXH3(fileName string) uint64 {
@@ -80,10 +73,13 @@ func NewFileIndex(fileName string) (error, *FileIndexed) {
 		birthF, birthSrcF = mtimeF, TimeBornSrcStat
 	}
 
+	hostname, err := os.Hostname()
+
 	fi := &FileIndexed{
 		Path:        fileName,
 		Size:        sizeF,
 		Mtime:       mtimeF,
+		Hostname:    hostname,
 		TimeBorn:    birthF,
 		TimeBornSrc: birthSrcF,
 	}
@@ -97,7 +93,7 @@ func NewFileIndex(fileName string) (error, *FileIndexed) {
 	buffer := make([]byte, 8192) // 8K makes msooxml tests happy and allows for expanded custom file checks
 
 	//1. mime
-	mimeF := ""
+	mimeF, mimesubF := "", ""
 	_, err = file.Read(buffer)
 	if err != nil && err != io.EOF {
 		log.Errorf("NewFileIndex: read %v err - %v", fileName, err)
@@ -106,10 +102,10 @@ func NewFileIndex(fileName string) (error, *FileIndexed) {
 		if err != nil {
 			log.Errorf("NewFileIndex: Match %v err - %v", fileName, err)
 		} else {
-			mimeF = typ.MIME.Value
+			mimeF, mimesubF = typ.MIME.Type, typ.MIME.Subtype
 		}
 	}
-	fi.MIME = mimeF
+	fi.MIMEType, fi.MIMESubtype = mimeF, mimesubF
 
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {

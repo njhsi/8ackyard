@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/barasher/go-exiftool"
 	"github.com/njhsi/8ackyard/internal/config"
@@ -75,8 +76,9 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 		}
 	}
 
-	if len(fi.MIME) == 0 {
-		fi.MIME = exif.MIMEType
+	if len(fi.MIMEType) == 0 && len(exif.MIMEType) > 0 {
+		mts := strings.Split(exif.MIMEType, "/")
+		fi.MIMEType, fi.MIMESubtype = mts[0], mts[1]
 	}
 	if exif.TakenAt.Year() > 1900 {
 		fi.TimeBorn, fi.TimeBornSrc = exif.TakenAt, TimeBornSrcMeta //TODO: exif.TimeZone
