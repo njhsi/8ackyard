@@ -1,10 +1,13 @@
 package backyard
 
 import (
+	"bytes"
 	"io/ioutil"
+	"os"
 
 	"github.com/barasher/go-exiftool"
 	"github.com/njhsi/8ackyard/internal/config"
+	"github.com/njhsi/8ackyard/pkg/fs"
 )
 
 type IndexOptions struct {
@@ -33,33 +36,53 @@ func IndexWorker(jobs <-chan IndexJob, et *exiftool.Exiftool) {
 }
 
 func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool.Exiftool, chDB chan *FileIndexed) {
-	log.Infof("mainIndex: entering, %v , %v", fileName, exifTool)
+	//	log.Infof("mainIndex: entering, %v , %v", fileName, exifTool)
 
 	sizeLimit := config.OriginalsLimit()
 
 	err, fi := NewFileIndex(fileName)
-
 	if err != nil || fi == nil || fi.Size <= 0 || fi.Size > sizeLimit {
 		log.Errorf("mainIndex: NewFileIndex - wrong of file size of  err=%v, fi=%v", err, fi)
 		return
 	}
 
-	if jbuf, err := buildExifJson(fileName, exifTool); err == nil {
-		exif := &ExifData{}
-		if err := exif.DataFromExiftool(jbuf); err != nil || exif.TakenAt.Year() < 1980 {
-			log.Errorf("mainIndex: DataFromExiftool $v - err=%v, exif=%v", fileName, err, exif)
-			//			return
-		} else {
-			log.Infof("mainIndex: exif(%v) -  %v", fileName, exif)
-			fi.TimeBorn, fi.TimeBornSrc = exif.TakenAt, TimeBornSrcMeta //TODO: exif.TimeZone
-			ids := Uint64ToString(fi.ID)
-			if exifJson, err := CacheName(ids, "json", "exiftool.json"); err == nil {
+	exif := &ExifData{}
+	idStr := Uint64ToString(fi.ID)
+	exifJson, err := CacheName(idStr, "json", "exiftool.json")
+	if err != nil {
+		log.Fatalf("mainIndex: CacheName - %v %v", fileName, err)
+	}
+	if fs.FileExists(exifJson) {
+		log.Infof("mainIndex: json %v existed ..", exifJson)
+		jsonFile, err := os.Open(exifJson)
+		if err != nil {
+			log.Fatalf("mainIndex: Open - %v %v", fileName, err)
+		}
+		defer jsonFile.Close()
+		var jbuf bytes.Buffer
+		jbuf.ReadFrom(jsonFile)
+		if err = exif.DataFromExiftool(jbuf.Bytes()); err != nil {
+			log.Errorf("mainIndex: exif.DataFromExiftool %v %v", exifJson, err)
+		}
+	} else {
+		if jbuf, err := buildExifJson(fileName, exifTool); err == nil {
+			if err := exif.DataFromExiftool(jbuf); err != nil {
+				log.Errorf("mainIndex: DataFromExiftool %v - err=%v, exif=%v", fileName, err, exif)
+			}
+			if exif.TakenAt.Year() > 1900 {
 				ioutil.WriteFile(exifJson, jbuf, 0644)
 			}
 		}
 	}
 
+	if len(fi.MIME) == 0 {
+		fi.MIME = exif.MIMEType
+	}
+	if exif.TakenAt.Year() > 1900 {
+		fi.TimeBorn, fi.TimeBornSrc = exif.TakenAt, TimeBornSrcMeta //TODO: exif.TimeZone
+	}
+
 	chDB <- fi
 
-	log.Infof("mainIndex:  DONE(%v) - %v - %v", fileName, fi, err)
+	log.Infof("mainIndex:  DONE(%v) - fi=%v | exif=%v |  err=%v", fileName, fi, exif, err)
 }

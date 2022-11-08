@@ -26,6 +26,7 @@ const CodecXMP = "xmp"
 
 // Data represents image meta data.
 type ExifData struct {
+	MIMEType     string        `meta:"MIMEType"`
 	DocumentID   string        `meta:"ImageUniqueID,OriginalDocumentID,DocumentID"`
 	InstanceID   string        `meta:"InstanceID,DocumentID"`
 	TakenAt      time.Time     `meta:"DateTimeOriginal,CreationDate,CreateDate,MediaCreateDate,ContentCreateDate,DateTimeDigitized,DateTime"`

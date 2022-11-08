@@ -29,10 +29,9 @@ type FileIndexed struct {
 	Size  int64
 	Mtime time.Time //mod time
 
-	TimeBorn    time.Time       //to be save in db as unix seconds
-	TimeBornSrc TimeBornSrcType //meta, name, auto
-	Format      string          // extension etc..
-	Mime        string
+	TimeBorn    time.Time        //to be save in db as unix seconds
+	TimeBornSrc TimeBornSrcType  //meta, name, auto
+	MIME        string           // xxx/yyy
 	Duplica     map[string]int64 //fullpath:modtime
 	Info        string
 }
@@ -47,10 +46,10 @@ func fileStat(fileName string) (error, time.Time, int64) {
 
 }
 
-func fileFormat(fileName string) string {
+func fileMime(fileName string) string {
 	ext := strings.ToLower(filepath.Ext(fileName))
 	if typ, err := filetype.MatchFile(fileName); err == nil {
-		ext = typ.Extension
+		ext = typ.MIME.Value
 	}
 	return ext
 }
@@ -97,22 +96,20 @@ func NewFileIndex(fileName string) (error, *FileIndexed) {
 	defer file.Close()
 	buffer := make([]byte, 8192) // 8K makes msooxml tests happy and allows for expanded custom file checks
 
-	//1. format
-	formatF := "UNK"
+	//1. mime
+	mimeF := ""
 	_, err = file.Read(buffer)
 	if err != nil && err != io.EOF {
 		log.Errorf("NewFileIndex: read %v err - %v", fileName, err)
-		formatF = "UNK"
 	} else {
 		typ, err := filetype.Match(buffer)
 		if err != nil {
 			log.Errorf("NewFileIndex: Match %v err - %v", fileName, err)
-			formatF = "UNK"
 		} else {
-			formatF = typ.Extension
+			mimeF = typ.MIME.Value
 		}
 	}
-	fi.Format = formatF
+	fi.MIME = mimeF
 
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {
