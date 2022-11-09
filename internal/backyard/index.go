@@ -140,37 +140,58 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	}
 	chDbWait := make(chan bool)
-	go func() {
-		//db
-		var fcount int
+	go func() { //db
+		sqlInsert := `insert into files(path, id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		sqlDelete := `delete from files where path=?`
 		var dbtx *sql.Tx
-		var stmt *sql.Stmt
+		var sInsert *sql.Stmt
+		var sDelete *sql.Stmt
 
+		var fcount int
 		for fi := range chDb {
-			//			log.Infof("index db:%v, fi:%v, fcount:%v", db, fi, fcount)
-			if fcount == 0 {
-				dbtx, _ = db.Begin()
-				//path text not null primary key, id integer not null, size integer not null, timemodified integer, hostname text, timeborn integer, timebornsrc text, mimetype text, mimesubtype text, info text
-				stmt, _ = dbtx.Prepare("insert into files(path, id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-			}
 			fcount = fcount + 1
-			if _, err := stmt.Exec(fi.Path, int64(fi.ID), fi.Size, fi.Hostname,
+
+			if dbtx == nil {
+				dbtx, _ = db.Begin()
+			}
+			if fid, ok := mapFiles[fi.Path]; ok {
+				log.Warnf("index db: conflicted path=%v, updating in db with id=%v to id=%v", fi.Path, fid.Id, fi.Id)
+				if sDelete == nil {
+					sDelete, _ = dbtx.Prepare(sqlDelete)
+				}
+				if _, err := sDelete.Exec(fi.Path); err != nil {
+					log.Warnf("index db: sDelete.Exec err=%v, fi=%v", err, fi)
+				}
+			}
+
+			if sInsert == nil {
+				sInsert, _ = dbtx.Prepare(sqlInsert)
+			}
+			if _, err := sInsert.Exec(fi.Path, int64(fi.Id), fi.Size, fi.Hostname,
 				fi.Mtime.Unix(), fi.TimeBorn.Unix(), fi.TimeBornSrc,
 				fi.MIMEType, fi.MIMESubtype, fi.Info); err != nil {
-				log.Warnf("index db: Exec err=%v, fi=%v", err, fi)
+				log.Warnf("index db: sInsert.Exec err=%v, fi=%v", err, fi)
 			}
+
 			if fcount == 100 {
 				fcount = 0
+				if sDelete != nil {
+					sDelete.Close()
+					sDelete = nil
+				}
+				if sInsert != nil {
+					sInsert.Close()
+					sInsert = nil
+				}
 				dbtx.Commit()
-				stmt.Close()
+				dbtx = nil
 			}
 		}
 
 		if fcount > 0 {
 			dbtx.Commit()
-			stmt.Close()
 		}
-		log.Infof("index db: exit %v", db)
+		log.Infof("index db: exit fcount=%v", fcount)
 		chDbWait <- true
 	}()
 

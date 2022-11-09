@@ -48,7 +48,7 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 	}
 
 	exif := &ExifData{}
-	idStr := Uint64ToString(fi.ID)
+	idStr := Uint64ToString(fi.Id)
 	exifJson, err := CacheName(idStr, "json", "exiftool.json")
 	if err != nil {
 		log.Fatalf("mainIndex: CacheName - %v %v", fileName, err)

@@ -43,7 +43,7 @@ func BackupWorker(jobs <-chan BackupJob) {
 func mainBackup(file *FileIndexed, opt BackupOptions) *FileBacked {
 	timeLoc, _ := time.LoadLocation("Asia/Chongqing")
 
-	baseName, fullPath, mType, hash := path.Base(file.Path), file.Path, file.Info, file.ID
+	baseName, fullPath, mType, hash := path.Base(file.Path), file.Path, file.Info, file.Id
 	takenAt, takenAtSrc := time.Unix(file.TimeBorn.Unix(), 0).In(timeLoc), file.TimeBornSrc
 	mtime := fs.BirthTime(fullPath).Unix() //TODO: birthtime not works?
 
@@ -56,7 +56,7 @@ func mainBackup(file *FileIndexed, opt BackupOptions) *FileBacked {
 	log.Infof("backup: STARTing file=%s, %s -> %s , %s, %v(%s)", baseName, fullPath, backupTo, hash, takenAt, takenAtSrc)
 
 	fb := FileBacked{
-		ID:      file.ID,
+		ID:      file.Id,
 		Path:    backupTo,
 		Size:    file.Size,
 		Duplica: map[string]int64{backupTo: mtime},

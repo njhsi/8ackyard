@@ -23,7 +23,7 @@ const (
 )
 
 type FileIndexed struct {
-	ID       uint64 //xxh3 of file content
+	Id       uint64 //xxh3 of file content
 	Path     string //full path
 	Size     int64
 	Hostname string    //uname of the machine
@@ -120,7 +120,7 @@ func NewFileIndex(fileName string) (error, *FileIndexed) {
 	if _, err := io.Copy(hash, file); err != nil {
 		log.Errorf("NewFileIndex: Copy for hash %v err - %v", fileName, err)
 	}
-	fi.ID = hash.Sum64()
+	fi.Id = hash.Sum64()
 
 	return nil, fi
 }
