@@ -209,7 +209,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	config.FileRoot = opt.Path
 
 	filesIndexed := 0
-	ignore := fs.NewIgnoreList(fs.IgnoreFile, true, false)
+	ignore := fs.NewIgnoreList(fs.IgnoreFile, false, false) //!! do not ignore hidden files
 
 	if err := ignore.Dir(originalsPath); err != nil {
 		log.Infof("index: %s", err)
