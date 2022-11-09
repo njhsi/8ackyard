@@ -89,17 +89,21 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			return done
 		}
 	}
-	mapFiles := make(map[string][2]int64) //path:(size,timemodified
+
+	type FileInDB struct {
+		Size  int64
+		Mtime int64
+		Id    int64
+	}
+	mapFiles := make(map[string]FileInDB)
 	dbtx, err := db.Begin()
-	dbrows, err := dbtx.Query("select path,size,timemodified from files;")
+	dbrows, err := dbtx.Query("select path,size,timemodified,id from files;")
 	for dbrows.Next() {
-		var r_path string
-		var r_size int64
-		var r_mtime int64
-		if err := dbrows.Scan(&r_path, &r_size, &r_mtime); err != nil {
+		fidPath, fid := "", FileInDB{}
+		if err := dbrows.Scan(&fidPath, &fid.Size, &fid.Mtime, &fid.Id); err != nil {
 			log.Fatalf("dbrows.Scan :%v", err)
 		}
-		mapFiles[r_path] = [2]int64{r_size, r_mtime}
+		mapFiles[fidPath] = fid
 	}
 	dbtx.Commit()
 	dbrows.Close()
@@ -150,10 +154,10 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 				stmt, _ = dbtx.Prepare("insert into files(path, id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 			}
 			fcount = fcount + 1
-			if _, errx := stmt.Exec(fi.Path, int64(fi.ID), fi.Size, fi.Hostname,
+			if _, err := stmt.Exec(fi.Path, int64(fi.ID), fi.Size, fi.Hostname,
 				fi.Mtime.Unix(), fi.TimeBorn.Unix(), fi.TimeBornSrc,
-				fi.MIMEType, fi.MIMESubtype, fi.Info); errx != nil {
-				log.Warn(errx)
+				fi.MIMEType, fi.MIMESubtype, fi.Info); err != nil {
+				log.Warnf("index db: Exec err=%v, fi=%v", err, fi)
 			}
 			if fcount == 100 {
 				fcount = 0
@@ -213,12 +217,12 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 			done[fileName] = fs.Found
 			log.Infof("index: Walk got file - %v", fileName)
-			if fiDB, ok := mapFiles[fileName]; ok == true {
+			if fid, ok := mapFiles[fileName]; ok == true {
 				if err, mtime, size := fileStat(fileName); err == nil {
 					mtime_ts := mtime.Unix()
-					if fiDB[0] == size && fiDB[1] == mtime_ts {
+					if fid.Size == size && fid.Mtime == mtime_ts { //TODO: strict option to check ID
 						done[fileName] = fs.Processed
-						log.Infof("index: Walk - %v was in db, not processing..", fileName)
+						log.Infof("index: Walk - file=[%v] with id=[%v] was in db, not processing..", fileName, fid.Id)
 					}
 				}
 			}
