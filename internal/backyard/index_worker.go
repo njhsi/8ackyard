@@ -104,5 +104,5 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 
 	chDB <- fi
 
-	log.Infof("mainIndex:  DONE(%v) - fi=%v | exif=%v |  err=%v.tz=%v, timeoffset=%v", fileName, fi, exif, err, exif.TimeZone, exif.OffsetTimeOriginal)
+	log.Infof("mainIndex:  DONE(%v) - fi=%v | exif.takenat=%v,tz=%v, timeoffset=%v | err=%v", fileName, fi, exif.TakenAt, exif.TimeZone, exif.OffsetTimeOriginal, err)
 }

@@ -3,6 +3,7 @@ package backyard
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	iofs "io/fs"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -141,6 +143,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	}
 	chDbWait := make(chan bool)
 	go func() { //db
+		sqlQuery := `select id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where path=?`
 		sqlInsert := `insert into files(path, id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		sqlDelete := `delete from files where path=?`
 		var dbtx *sql.Tx
@@ -156,6 +159,13 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			}
 			if fid, ok := mapFiles[fi.Path]; ok {
 				log.Warnf("index db: conflicted path=%v, updating in db with id=%v to id=%v", fi.Path, fid.Id, fi.Id)
+				var q_id, q_size, q_timemodified, q_timeborn int64
+				var q_hostname, q_timebornsrc, q_mimetype, q_mimesubtype, q_info string
+				dbRow := dbtx.QueryRow(sqlQuery, fi.Path)
+				if err := dbRow.Scan(&q_id, &q_size, &q_hostname, &q_timemodified, &q_timeborn, &q_timebornsrc, &q_mimetype, &q_mimesubtype, &q_info); err == nil {
+					q_info = q_info + fmt.Sprintf("\nid=%v size=%v hostname=%v timemodified=%v timeborn=%v timebornsrc=%v mimetype=%v mimesubtype=%v NOW=%v", q_id, q_size, q_hostname, q_timemodified, q_timeborn, q_timebornsrc, q_mimetype, q_mimesubtype, time.Now()) + fi.Info
+					fi.Info = q_info //!!! checkpoint
+				}
 				if sDelete == nil {
 					sDelete, _ = dbtx.Prepare(sqlDelete)
 				}
