@@ -129,8 +129,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		var stmt *sql.Stmt
 
 		for fi := range chDb {
-			log.Infof("index db:%v, fi:%v, fcount:%v", db, fi, fcount)
-
+			//			log.Infof("index db:%v, fi:%v, fcount:%v", db, fi, fcount)
 			if fcount == 0 {
 				dbtx, _ = db.Begin()
 				//path text not null primary key, id integer not null, size integer not null, timemodified integer, hostname text, timeborn integer, timebornsrc text, mimetype text, mimesubtype text, info text
@@ -194,6 +193,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 					log.Infof("index.folder filePath /%s", relName)
 				}
 
+				log.Infof("index: SkipWalk result=%v", result)
 				return result
 			}
 
@@ -205,6 +205,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 				Ind:      ind,
 				ChDB:     chDb,
 			}
+			done[fileName] = fs.Processed
 
 			return nil
 		},

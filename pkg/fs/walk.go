@@ -8,7 +8,8 @@ import (
 // SkipWalk returns true if the file or directory should be skipped in godirwalk.Walk()
 func SkipWalk(fileName string, isDir, isSymlink bool, done Done, ignore *IgnoreList) (skip bool, result error) {
 	isDone := done[fileName].Exists()
-	isIgnored := ignore.Ignore(fileName)
+	//	isIgnored := ignore.Ignore(fileName) //hidden files ..
+	isIgnored := false
 
 	if isSymlink {
 		// Symlinks are skipped by default unless they are links to directories
