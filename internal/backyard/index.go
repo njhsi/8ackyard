@@ -222,8 +222,10 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			isDir := info.IsDir()
 			isSymlink := info.IsSymlink()
 			relName := fs.RelName(fileName, originalsPath)
+			skip, result := fs.SkipWalk(fileName, isDir, isSymlink, done, ignore)
 
-			if skip, result := fs.SkipWalk(fileName, isDir, isSymlink, done, ignore); skip {
+			log.Infof("index: Walk got a file(skip=%v) - %v", skip, fileName)
+			if skip {
 				if (isSymlink || isDir) && result != filepath.SkipDir {
 					log.Infof("index: added folder /%s", fileName)
 				}
@@ -232,12 +234,11 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 					log.Infof("index.folder filePath /%s", relName)
 				}
 
-				log.Infof("index: SkipWalk result=%v", result)
 				return result
 			}
 
 			done[fileName] = fs.Found
-			log.Infof("index: Walk got file - %v", fileName)
+
 			if fid, ok := mapFiles[fileName]; ok == true {
 				if err, mtime, size := fileStat(fileName); err == nil {
 					mtime_ts := mtime.Unix()
