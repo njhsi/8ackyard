@@ -85,16 +85,30 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
                `
 		_, err = db.Exec(sqlStmt)
 		if err != nil {
-			log.Errorf("db failed: Exec %q: %s", err, sqlStmt)
+			log.Fatalf("db failed: Exec %q: %s", err, sqlStmt)
 			return done
 		}
 	}
+	mapFiles := make(map[string][2]int64) //path:(size,timemodified
+	dbtx, err := db.Begin()
+	dbrows, err := dbtx.Query("select path,size,timemodified from files;")
+	for dbrows.Next() {
+		var r_path string
+		var r_size int64
+		var r_mtime int64
+		if err := dbrows.Scan(&r_path, &r_size, &r_mtime); err != nil {
+			log.Fatalf("dbrows.Scan :%v", err)
+		}
+		mapFiles[r_path] = [2]int64{r_size, r_mtime}
+	}
+	dbtx.Commit()
+	dbrows.Close()
+	log.Infof("index: loaded %v files in db", len(mapFiles))
 
 	if err := mutex.MainWorker.Start(); err != nil {
 		log.Errorf("index: %s", err.Error())
 		return done
 	}
-
 	defer mutex.MainWorker.Stop()
 
 	jobs := make(chan IndexJob)
@@ -199,11 +213,22 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 			done[fileName] = fs.Found
 			log.Infof("index: Walk got file - %v", fileName)
-			jobs <- IndexJob{
-				FileName: fileName,
-				IndexOpt: opt,
-				Ind:      ind,
-				ChDB:     chDb,
+			if fiDB, ok := mapFiles[fileName]; ok == true {
+				if err, mtime, size := fileStat(fileName); err == nil {
+					mtime_ts := mtime.Unix()
+					if fiDB[0] == size && fiDB[1] == mtime_ts {
+						done[fileName] = fs.Processed
+						log.Infof("index: Walk - %v was in db, not processing..", fileName)
+					}
+				}
+			}
+			if done[fileName] != fs.Processed {
+				jobs <- IndexJob{
+					FileName: fileName,
+					IndexOpt: opt,
+					Ind:      ind,
+					ChDB:     chDb,
+				}
 			}
 			done[fileName] = fs.Processed
 
