@@ -18,7 +18,7 @@ import (
 
 	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/mutex"
-	"github.com/njhsi/8ackyard/pkg/fs"
+	"github.com/photoprism/photoprism/pkg/fs"
 )
 
 // Index represents an indexer that indexes files in the originals directory.

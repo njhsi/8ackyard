@@ -5,10 +5,12 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/barasher/go-exiftool"
 	"github.com/njhsi/8ackyard/internal/config"
-	"github.com/njhsi/8ackyard/pkg/fs"
+	"github.com/njhsi/8ackyard/internal/meta"
+	"github.com/photoprism/photoprism/pkg/fs"
 )
 
 type IndexOptions struct {
@@ -47,7 +49,7 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 		return
 	}
 
-	exif := &ExifData{}
+	exif := &meta.Data{}
 	idStr := Uint64ToString(fi.Id)
 	exifJson, err := CacheName(idStr, "json", "exiftool.json")
 	if err != nil {
@@ -62,12 +64,12 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 		defer jsonFile.Close()
 		var jbuf bytes.Buffer
 		jbuf.ReadFrom(jsonFile)
-		if err = exif.DataFromExiftool(jbuf.Bytes()); err != nil {
+		if err = exif.Exiftool(jbuf.Bytes(), ""); err != nil { //TODO: exif.JSON(exifJson,"")
 			log.Errorf("mainIndex: exif.DataFromExiftool %v %v", exifJson, err)
 		}
 	} else {
 		if jbuf, err := buildExifJson(fileName, exifTool); err == nil {
-			if err := exif.DataFromExiftool(jbuf); err != nil {
+			if err := exif.Exiftool(jbuf, ""); err != nil {
 				log.Errorf("mainIndex: DataFromExiftool %v - err=%v, exif=%v", fileName, err, exif)
 			}
 			if exif.TakenAt.Year() > 1900 {
@@ -81,10 +83,26 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 		fi.MIMEType, fi.MIMESubtype = mts[0], mts[1]
 	}
 	if exif.TakenAt.Year() > 1900 {
-		fi.TimeBorn, fi.TimeBornSrc = exif.TakenAt, TimeBornSrcMeta //TODO: exif.TimeZone
+		takeAt := exif.TakenAt
+		if len(exif.TimeZone) == 0 {
+			timeLoc, _ := time.LoadLocation("Asia/Chongqing")
+			if len(exif.OffsetTimeOriginal) > 0 {
+				layouts := [4]string{"+08:00", "+0800", "-08:00", "-0800"}
+				for _, layout := range layouts {
+					if tos, err := time.Parse(layout, exif.OffsetTimeOriginal); err == nil {
+						timeLoc = tos.Location()
+						log.Infof("mainIndex: lookup timezone by layout=%v, got loc=%v", layout, timeLoc)
+						break
+					}
+				}
+
+			}
+			takeAt = time.Unix(takeAt.Unix(), 0).In(timeLoc)
+		}
+		fi.TimeBorn, fi.TimeBornSrc = takeAt, TimeBornSrcMeta //TODO: exif.TimeZone
 	}
 
 	chDB <- fi
 
-	log.Infof("mainIndex:  DONE(%v) - fi=%v | exif=%v |  err=%v", fileName, fi, exif, err)
+	log.Infof("mainIndex:  DONE(%v) - fi=%v | exif=%v |  err=%v.tz=%v, timeoffset=%v", fileName, fi, exif, err, exif.TimeZone, exif.OffsetTimeOriginal)
 }

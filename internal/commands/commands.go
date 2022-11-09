@@ -5,7 +5,7 @@ import (
 	"syscall"
 
 	"github.com/njhsi/8ackyard/internal/event"
-	"github.com/njhsi/8ackyard/pkg/fs"
+	"github.com/photoprism/photoprism/pkg/fs"
 	"github.com/sevlyar/go-daemon"
 )
 

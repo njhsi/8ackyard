@@ -15,7 +15,7 @@ import (
 	"github.com/njhsi/8ackyard/internal/backyard"
 	"github.com/njhsi/8ackyard/internal/mutex"
 	"github.com/njhsi/8ackyard/internal/service"
-	"github.com/njhsi/8ackyard/pkg/fs"
+	"github.com/photoprism/photoprism/pkg/fs"
 )
 
 // IndexCommand registers the index cli command.

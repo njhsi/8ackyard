@@ -6,7 +6,7 @@ import (
 
 	"github.com/njhsi/8ackyard/internal/config"
 	"github.com/njhsi/8ackyard/internal/event"
-	"github.com/njhsi/8ackyard/pkg/fs"
+	"github.com/photoprism/photoprism/pkg/fs"
 )
 
 var log = event.Log

@@ -164,5 +164,7 @@ func guestTimeBorn(fileName string) time.Time {
 	if tbase.Year() > 1980 && tbase.Before(tname) {
 		tname = tbase
 	}
+	timeLoc, _ := time.LoadLocation("Asia/Chongqing")
+	tname = time.Unix(tname.Unix(), 0).In(timeLoc)
 	return tname
 }
