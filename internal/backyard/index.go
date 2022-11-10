@@ -98,9 +98,9 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		}
 	}
 
-	mapFiles := make(map[string]File8)
+	mapFiles := make(map[string]File8) //TODO: instead, query db when neccessary
 	dbtx, err := db.Begin()
-	dbrows, err := dbtx.Query("select name,size,timemodified,id from files;")
+	dbrows, err := dbtx.Query("select name,size,timemodified,id from files;") //TODO: by hostname
 	for dbrows.Next() {
 		fidPath, fid := "", File8{}
 		if err := dbrows.Scan(&fidPath, &fid.Size, &fid.TimeModified, &fid.Id); err != nil {
@@ -144,7 +144,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	}
 	chDbWait := make(chan bool)
 	go func() { //db
-		sqlQuery := `select id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where name=?`
+		sqlQuery := `select id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where name=? and hostname=?`
 		sqlInsert := `insert into files(name, id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		sqlDelete := `delete from files where name=?`
 		var dbtx *sql.Tx
@@ -160,12 +160,11 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			}
 			if fid, ok := mapFiles[fi.Name]; ok {
 				log.Warnf("index db: conflicted path=%v, updating in db with id=%v to id=%v", fi.Name, fid.Id, fi.Id)
-				var q_id, q_size, q_timemodified, q_timeborn int64
-				var q_hostname, q_timebornsrc, q_mimetype, q_mimesubtype, q_info string
-				dbRow := dbtx.QueryRow(sqlQuery, fi.Name)
-				if err := dbRow.Scan(&q_id, &q_size, &q_hostname, &q_timemodified, &q_timeborn, &q_timebornsrc, &q_mimetype, &q_mimesubtype, &q_info); err == nil {
-					q_info = q_info + fmt.Sprintf("\nid=%v size=%v hostname=%v timemodified=%v timeborn=%v timebornsrc=%v mimetype=%v mimesubtype=%v NOW=%v", q_id, q_size, q_hostname, q_timemodified, q_timeborn, q_timebornsrc, q_mimetype, q_mimesubtype, time.Now()) + fi.Info
-					fi.Info = q_info //!!! checkpoint
+				fiOld := File8{}
+				dbRow := dbtx.QueryRow(sqlQuery, fi.Name, fi.Hostname)
+				if err := dbRow.Scan(&fiOld.Id, &fiOld.Size, &fiOld.Hostname, &fiOld.TimeModified, &fiOld.TimeBorn, &fiOld.TimeBornSrc,
+					&fiOld.MIMEType, &fiOld.MIMESubtype, &fiOld.Info); err == nil {
+					fi.Info = fmt.Sprintf("\fi=%+v NOW=%v", fiOld, time.Now()) + fi.Info //checkpoint
 				}
 				if sDelete == nil {
 					sDelete, _ = dbtx.Prepare(sqlDelete)
@@ -302,7 +301,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		//collect of distinct files to backup
 		ids := make([]int64, 0)
 		dbtx, _ := db.Begin()
-		dbrows, _ := dbtx.Query("select distinct id from files;")
+		dbrows, _ := dbtx.Query("select distinct id from files;") //TODO: by hostname
 		for dbrows.Next() {
 			var id int64
 			if err := dbrows.Scan(&id); err == nil {
@@ -335,15 +334,19 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			var fcount int
 			var dbtx *sql.Tx
 			var stmt *sql.Stmt
+			sqlInsert := `insert into filez(name, id, size, hostname, timemodified, timeborn, timebornsrc,
+                                       mimetype, mimesubtype, info) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
 			for fb := range chDb2 {
 				if fcount == 0 {
 					dbtx, _ = db.Begin()
-					stmt, _ = dbtx.Prepare("insert into file(idxxh3,  size, birth, type, name) values(?, ?, ?, ?, ?, ?)")
+					stmt, _ = dbtx.Prepare(sqlInsert)
 				}
 				fcount = fcount + 1
 
-				if _, errx := stmt.Exec(fb); errx != nil {
-					log.Fatal(errx)
+				if _, err := stmt.Exec(fb.Name, fb.Id, fb.Size, fb.Hostname, fb.TimeModified, fb.TimeBorn, fb.TimeBornSrc,
+					fb.MIMEType, fb.MIMESubtype, fb.Info); err != nil {
+					log.Fatal(err)
 				}
 				if fcount == 100 {
 					fcount = 0
@@ -359,9 +362,8 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		}()
 
 		//load the backup jobs
-		queryIndexed := `select name, hostname, size, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where id=?`
-		//(id integer not null primary key, size integer not null, timemodified integer,  mime text, name text not null, info text)
-		queryBacked := `select name, hostname, size, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from filez where id=?` //existed backup
+		queryIndexed := `select name, hostname, size, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where id=?` //TODO: by hostname
+		queryBacked := `select name, hostname, size, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from filez where id=?`  //existed backup
 		for _, id := range ids {
 			job := BackupJob{
 				Id:        id,

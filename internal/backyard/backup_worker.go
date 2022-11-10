@@ -30,29 +30,37 @@ func BackupWorker(jobs <-chan BackupJob) {
 			continue
 		}
 
-		name, timemodified, timeborn, size := filepath.Base(f0.Name), f0.TimeModified, f0.TimeBorn, f0.Size
+		fb := *f0 //clone
+		fb.Name = filepath.Base(fb.Name)
+
 		for _, f := range job.Files {
 			f_name := filepath.Base(f.Name)
 
-			if f.Size != size || (f.TimeBornSrc == TimeBornSrcMeta && f.TimeBorn != timeborn) {
-				log.Fatalf("BackupWorker: conflicted files(size, or birth) - %+v, size=%v, born=%v", f, size, timeborn)
+			if f.Size != fb.Size || (f.TimeBornSrc == TimeBornSrcMeta && f.TimeBorn != fb.TimeBorn) {
+				log.Fatalf("BackupWorker: conflicted files(size, or birth) - %+v, size=%v, born=%v", f, fb.Size, fb.TimeBorn)
 			}
-			if f.TimeModified < timemodified {
-				timemodified = f.TimeModified
+			if f.TimeModified < fb.TimeModified {
+				fb.TimeModified = f.TimeModified
 			}
-			if f_name != name {
+			if f_name != fb.Name {
 				log.Warnf("BackupWorker: id=%v with another name %v", f.Id, f_name)
 			}
-			if len(f_name) < len(name) {
-				name = f_name //prefer short name
+			if len(f_name) < len(fb.Name) {
+				fb.Name = f_name //prefer short name
 			}
-			if f.TimeBorn < timeborn {
-				timeborn = f.TimeBorn
+			if f.TimeBorn < fb.TimeBorn {
+				fb.TimeBorn = f.TimeBorn
 			}
 		}
 		//make the destination to backup
-		birth := time.Unix(timeborn, 0).Local()
-		dest := "/" + f0.MIMEType + "/" + birth.Format("2006/01/02") + "/" + name
+		birth := time.Unix(fb.TimeBorn, 0).Local()
+		dest := "/" + f0.MIMEType + "/" + birth.Format("2006/01/02") + "/" + fb.Name
+		//update fb
+
+		//do backup on disk: 1)check if existed on disk
+
+		job.ChDB <- &fb
+
 		log.Infof("BackupWorker: choose birth=%v dest=%v - fi=%+v", birth, dest, f0)
 	}
 }
