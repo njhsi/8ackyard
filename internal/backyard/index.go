@@ -298,15 +298,24 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	// BACKUP to destine
 	if opt.BackupPath != "" {
+		ids := make([]int64, 0)
+
+		dbtx, _ := db.Begin()
+		dbrows, _ := dbtx.Query("select distinct id from files;")
+		for dbrows.Next() {
+			var id int64
+			if err := dbrows.Scan(&id); err == nil {
+				ids = append(ids, id)
+			}
+		}
+		log.Infof("index: backup starts, %v distinct files in db", len(ids))
 
 		backupOpt := BackupOptions{
 			OriginalsPath: opt.Path,
 			BackupPath:    opt.BackupPath,
 			CachePath:     opt.CachePath,
 			NumWorkers:    opt.NumWorkers,
-			//			Store:         ind.storeBackup,
 		}
-		log.Infof(backupOpt.BackupPath)
 
 		jobs2 := make(chan BackupJob)
 		chDb2 := make(chan *FileBacked, 50)
@@ -345,6 +354,26 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			}
 			chDbWait <- true
 		}()
+
+		//load the backup jobs
+		var q_path string
+		var q_size, q_timemodified, q_timeborn int64
+		var q_hostname, q_timebornsrc, q_mimetype, q_mimesubtype, q_info string
+		sqlQuery := `select path, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where id=?`
+		for _, id := range ids {
+			var size int64
+			rows, _ := dbtx.Query(sqlQuery, id)
+			for rows.Next() {
+				if err := rows.Scan(&q_path, &q_size, &q_hostname, &q_timemodified, &q_timeborn, &q_timebornsrc, &q_mimetype, &q_mimesubtype, &q_info); err == nil {
+					if size != 0 && size != q_size {
+						log.Fatalf("backup: different size with same id %v, %v", id, backupOpt)
+					}
+					log.Infof("backup: Scan %v %v", q_path, id)
+				}
+			}
+
+		}
+		dbtx.Commit()
 
 		ind.mutex.RLock()
 		defer ind.mutex.RUnlock()
