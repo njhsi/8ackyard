@@ -97,7 +97,6 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	dbrows, err := dbtx.Query("select path,size,timemodified,id from files;")
 	for dbrows.Next() {
 		fidPath, fid := "", File8{}
-		log.Warnf("index: to Scan...")
 		if err := dbrows.Scan(&fidPath, &fid.Size, &fid.TimeModified, &fid.Id); err != nil {
 			log.Fatalf("dbrows.Scan :%v", err)
 		}
@@ -354,19 +353,21 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		//load the backup jobs
 		sqlQuery := `select path, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where id=?`
 		for _, id := range ids {
-			job := BackupJob{Id: id}
-			fid := &File8{
-				Id: id,
+			job := BackupJob{
+				Id:        id,
+				BackupOpt: backupOpt,
+				ChDB:      chDb2,
 			}
 			rows, _ := dbtx.Query(sqlQuery, id)
 			for rows.Next() {
+				fid := &File8{Id: id}
 				if err := rows.Scan(&fid.Path, &fid.Size, &fid.Hostname, &fid.TimeModified, &fid.TimeBorn, &fid.TimeBornSrc, &fid.MIMEType, &fid.MIMESubtype, &fid.Info); err == nil {
 					log.Infof("backup: Scan %v %v %v", fid.Path, id, backupOpt)
-
+					job.Files = append(job.Files, fid)
 				}
-			}
-			jobs2 <- job
+				jobs2 <- job
 
+			}
 		}
 		dbtx.Commit()
 
