@@ -23,7 +23,7 @@ type BackupJob struct {
 func BackupWorker(jobs <-chan BackupJob) {
 	for job := range jobs {
 		f0 := job.Files[0]
-		log.Infof("BackupWorker:                   got a job with %+v, %v files total. uniq=%v ", f0, len(job.Files), len(job.Files) == 1)
+		log.Infof("BackupWorker:     got a job[%v %v], %v files. uniq=%v ", f0.Id, f0.Path, len(job.Files), len(job.Files) == 1)
 		if f0.MIMEType != "video" && f0.MIMEType != "audio" && f0.MIMEType != "image" {
 			log.Warnf("BackupWorker: ignore this mime[%v]..... %+v", f0.MIMEType, f0)
 			continue

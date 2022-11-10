@@ -361,13 +361,12 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			rows, _ := dbtx.Query(sqlQuery, id)
 			for rows.Next() {
 				fid := &File8{Id: id}
-				if err := rows.Scan(&fid.Path, &fid.Size, &fid.Hostname, &fid.TimeModified, &fid.TimeBorn, &fid.TimeBornSrc, &fid.MIMEType, &fid.MIMESubtype, &fid.Info); err == nil {
-					log.Infof("backup: Scan %v %v %v", fid.Path, id, backupOpt)
+				if err := rows.Scan(&fid.Path, &fid.Size, &fid.Hostname, &fid.TimeModified, &fid.TimeBorn, &fid.TimeBornSrc,
+					&fid.MIMEType, &fid.MIMESubtype, &fid.Info); err == nil {
 					job.Files = append(job.Files, fid)
 				}
-				jobs2 <- job
-
 			}
+			jobs2 <- job
 		}
 		dbtx.Commit()
 
