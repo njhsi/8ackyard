@@ -24,7 +24,7 @@ const (
 
 type File8 struct {
 	Id           int64  //xxh3 of file content
-	Path         string //full path
+	Name         string //full path for indexed files, basename for backup files
 	Size         int64
 	Hostname     string //uname of the machine
 	TimeModified int64  //mod time: unix timestamp, utc
@@ -78,7 +78,7 @@ func NewFileIndex(fileName string) (error, *File8) {
 	hostname, err := os.Hostname()
 
 	fi := &File8{
-		Path:         fileName,
+		Name:         fileName,
 		Size:         sizeF,
 		TimeModified: mtimeF.Unix(),
 		Hostname:     hostname,

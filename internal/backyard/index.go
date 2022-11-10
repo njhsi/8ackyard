@@ -80,8 +80,12 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	if !dbExisted {
 		// id: xxhash h3 64bit
 		sqlStmt := `
-               create table filez (id integer not null primary key, size integer not null, birth integer, type text, name text);
-               create table files (path text not null primary key, id integer not null, size integer not null, hostname text, timemodified integer, timeborn integer, timebornsrc text, mimetype text, mimesubtype text, info text);
+               create table filez (id integer not null primary key, name text not null,
+                                   size integer not null, timemodified integer, timeborn integer, timebornsrc text,
+                                   mimetype text, mimesubtype text, info text);
+               create table files (name text not null primary key, id integer not null, 
+                                   size integer not null, timemodified integer, timeborn integer, timebornsrc text, 
+                                   mimetype text, mimesubtype text, info text,hostname text);
                delete from filez;
                delete from files;
                `
@@ -94,7 +98,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	mapFiles := make(map[string]File8)
 	dbtx, err := db.Begin()
-	dbrows, err := dbtx.Query("select path,size,timemodified,id from files;")
+	dbrows, err := dbtx.Query("select name,size,timemodified,id from files;")
 	for dbrows.Next() {
 		fidPath, fid := "", File8{}
 		if err := dbrows.Scan(&fidPath, &fid.Size, &fid.TimeModified, &fid.Id); err != nil {
@@ -138,9 +142,9 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	}
 	chDbWait := make(chan bool)
 	go func() { //db
-		sqlQuery := `select id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where path=?`
-		sqlInsert := `insert into files(path, id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-		sqlDelete := `delete from files where path=?`
+		sqlQuery := `select id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where name=?`
+		sqlInsert := `insert into files(name, id, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		sqlDelete := `delete from files where name=?`
 		var dbtx *sql.Tx
 		var sInsert *sql.Stmt
 		var sDelete *sql.Stmt
@@ -152,11 +156,11 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			if dbtx == nil {
 				dbtx, _ = db.Begin()
 			}
-			if fid, ok := mapFiles[fi.Path]; ok {
-				log.Warnf("index db: conflicted path=%v, updating in db with id=%v to id=%v", fi.Path, fid.Id, fi.Id)
+			if fid, ok := mapFiles[fi.Name]; ok {
+				log.Warnf("index db: conflicted path=%v, updating in db with id=%v to id=%v", fi.Name, fid.Id, fi.Id)
 				var q_id, q_size, q_timemodified, q_timeborn int64
 				var q_hostname, q_timebornsrc, q_mimetype, q_mimesubtype, q_info string
-				dbRow := dbtx.QueryRow(sqlQuery, fi.Path)
+				dbRow := dbtx.QueryRow(sqlQuery, fi.Name)
 				if err := dbRow.Scan(&q_id, &q_size, &q_hostname, &q_timemodified, &q_timeborn, &q_timebornsrc, &q_mimetype, &q_mimesubtype, &q_info); err == nil {
 					q_info = q_info + fmt.Sprintf("\nid=%v size=%v hostname=%v timemodified=%v timeborn=%v timebornsrc=%v mimetype=%v mimesubtype=%v NOW=%v", q_id, q_size, q_hostname, q_timemodified, q_timeborn, q_timebornsrc, q_mimetype, q_mimesubtype, time.Now()) + fi.Info
 					fi.Info = q_info //!!! checkpoint
@@ -164,7 +168,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 				if sDelete == nil {
 					sDelete, _ = dbtx.Prepare(sqlDelete)
 				}
-				if _, err := sDelete.Exec(fi.Path); err != nil {
+				if _, err := sDelete.Exec(fi.Name); err != nil {
 					log.Warnf("index db: sDelete.Exec err=%v, fi=%v", err, fi)
 				}
 			}
@@ -172,7 +176,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			if sInsert == nil {
 				sInsert, _ = dbtx.Prepare(sqlInsert)
 			}
-			if _, err := sInsert.Exec(fi.Path, fi.Id, fi.Size, fi.Hostname,
+			if _, err := sInsert.Exec(fi.Name, fi.Id, fi.Size, fi.Hostname,
 				fi.TimeModified, fi.TimeBorn, fi.TimeBornSrc,
 				fi.MIMEType, fi.MIMESubtype, fi.Info); err != nil {
 				log.Warnf("index db: sInsert.Exec err=%v, fi=%v", err, fi)
@@ -293,8 +297,8 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 
 	// BACKUP to destine
 	if opt.BackupPath != "" {
+		//collect of distinct files to backup
 		ids := make([]int64, 0)
-
 		dbtx, _ := db.Begin()
 		dbrows, _ := dbtx.Query("select distinct id from files;")
 		for dbrows.Next() {
@@ -304,6 +308,8 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			}
 		}
 		log.Infof("index: backup starts, %v distinct files in db", len(ids))
+
+		//collect of files back'd up and existed in db ?
 
 		backupOpt := BackupOptions{
 			OriginalsPath: opt.Path,
@@ -351,21 +357,31 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		}()
 
 		//load the backup jobs
-		sqlQuery := `select path, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where id=?`
+		queryIndexed := `select name, size, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info, hostname from files where id=?`
+		//(id integer not null primary key, size integer not null, timemodified integer,  mime text, name text not null, info text)
+		queryBacked := `select name, size, timemodified,  timeborn, timebornsrc, mimetype, mimesubtype, info from filez where id=?` //existed backup
 		for _, id := range ids {
 			job := BackupJob{
 				Id:        id,
 				BackupOpt: backupOpt,
 				ChDB:      chDb2,
 			}
-			rows, _ := dbtx.Query(sqlQuery, id)
+			rows, _ := dbtx.Query(queryIndexed, id)
 			for rows.Next() {
-				fid := &File8{Id: id}
-				if err := rows.Scan(&fid.Path, &fid.Size, &fid.Hostname, &fid.TimeModified, &fid.TimeBorn, &fid.TimeBornSrc,
-					&fid.MIMEType, &fid.MIMESubtype, &fid.Info); err == nil {
-					job.Files = append(job.Files, fid)
+				fi := &File8{Id: id}
+				if err := rows.Scan(&fi.Name, &fi.Size, &fi.TimeModified, &fi.TimeBorn, &fi.TimeBornSrc,
+					&fi.MIMEType, &fi.MIMESubtype, &fi.Info, &fi.Hostname); err == nil {
+					job.Files = append(job.Files, fi)
 				}
 			}
+
+			fb := &File8{Id: id} //back'd up
+			row := dbtx.QueryRow(queryBacked, id)
+			if err := row.Scan(&fb.Name, &fb.Size, &fb.TimeModified, &fb.TimeBorn, &fb.TimeBornSrc,
+				&fb.MIMEType, &fb.MIMESubtype, &fb.Info); err == nil {
+				job.BackFile = fb
+			}
+
 			jobs2 <- job
 		}
 		dbtx.Commit()
