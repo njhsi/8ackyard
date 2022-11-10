@@ -78,14 +78,16 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	}
 	defer db.Close()
 	if !dbExisted {
-		// id: xxhash h3 64bit
+		// id: xxhash h3 64bit. INT rather than INTEGER of sqlite, constraints non-auto-incremental as primary key needs.
 		sqlStmt := `
-               create table filez (id integer not null primary key, name text not null,
+               create table filez (id int not null, name text not null, hostname text,
                                    size integer not null, timemodified integer, timeborn integer, timebornsrc text,
-                                   mimetype text, mimesubtype text, info text);
-               create table files (name text not null primary key, id integer not null, 
-                                   size integer not null, timemodified integer, timeborn integer, timebornsrc text, 
-                                   mimetype text, mimesubtype text, info text,hostname text);
+                                   mimetype text, mimesubtype text, info text,
+                                   primary key(id));
+               create table files (name text not null, hostname text not null, id int not null,
+                                   size integer not null, timemodified integer, timeborn integer, timebornsrc text,
+                                   mimetype text, mimesubtype text, info text,
+                                   primary key(name, hostname));
                delete from filez;
                delete from files;
                `
@@ -357,9 +359,9 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		}()
 
 		//load the backup jobs
-		queryIndexed := `select name, size, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info, hostname from files where id=?`
+		queryIndexed := `select name, hostname, size, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where id=?`
 		//(id integer not null primary key, size integer not null, timemodified integer,  mime text, name text not null, info text)
-		queryBacked := `select name, size, timemodified,  timeborn, timebornsrc, mimetype, mimesubtype, info from filez where id=?` //existed backup
+		queryBacked := `select name, hostname, size, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from filez where id=?` //existed backup
 		for _, id := range ids {
 			job := BackupJob{
 				Id:        id,
@@ -369,15 +371,15 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			rows, _ := dbtx.Query(queryIndexed, id)
 			for rows.Next() {
 				fi := &File8{Id: id}
-				if err := rows.Scan(&fi.Name, &fi.Size, &fi.TimeModified, &fi.TimeBorn, &fi.TimeBornSrc,
-					&fi.MIMEType, &fi.MIMESubtype, &fi.Info, &fi.Hostname); err == nil {
+				if err := rows.Scan(&fi.Name, &fi.Hostname, &fi.Size, &fi.TimeModified, &fi.TimeBorn, &fi.TimeBornSrc,
+					&fi.MIMEType, &fi.MIMESubtype, &fi.Info); err == nil {
 					job.Files = append(job.Files, fi)
 				}
 			}
 
 			fb := &File8{Id: id} //back'd up
 			row := dbtx.QueryRow(queryBacked, id)
-			if err := row.Scan(&fb.Name, &fb.Size, &fb.TimeModified, &fb.TimeBorn, &fb.TimeBornSrc,
+			if err := row.Scan(&fb.Name, &fb.Hostname, &fb.Size, &fb.TimeModified, &fb.TimeBorn, &fb.TimeBornSrc,
 				&fb.MIMEType, &fb.MIMESubtype, &fb.Info); err == nil {
 				job.BackFile = fb
 			}
