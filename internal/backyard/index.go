@@ -118,7 +118,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 	defer mutex.MainWorker.Stop()
 
 	jobs := make(chan IndexJob)
-	chDb := make(chan *FileIndexed, 50)
+	chDb := make(chan *File8, 50)
 
 	// Start a fixed number of goroutines to index files.
 	var wg sync.WaitGroup
@@ -178,7 +178,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 				sInsert, _ = dbtx.Prepare(sqlInsert)
 			}
 			if _, err := sInsert.Exec(fi.Path, int64(fi.Id), fi.Size, fi.Hostname,
-				fi.Mtime.Unix(), fi.TimeBorn.Unix(), fi.TimeBornSrc,
+				fi.Mtime, fi.TimeBorn, fi.TimeBornSrc,
 				fi.MIMEType, fi.MIMESubtype, fi.Info); err != nil {
 				log.Warnf("index db: sInsert.Exec err=%v, fi=%v", err, fi)
 			}

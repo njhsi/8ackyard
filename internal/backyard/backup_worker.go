@@ -19,7 +19,7 @@ type BackupOptions struct {
 
 type BackupJob struct {
 	BackupOpt BackupOptions
-	File      *FileIndexed
+	File      *File8
 	ChDB      chan *FileBacked
 }
 
@@ -32,7 +32,7 @@ func BackupWorker(jobs <-chan BackupJob) {
 	}
 }
 
-func mainBackup(file *FileIndexed, opt BackupOptions) *FileBacked {
+func mainBackup(file *File8, opt BackupOptions) *FileBacked {
 	//	timeLoc, _ := time.LoadLocation("Asia/Chongqing")
 	//	baseName, fullPath, mType, hash := path.Base(file.Path), file.Path, file.Info, file.Id
 	//	takenAt, takenAtSrc := time.Unix(file.TimeBorn.Unix(), 0).In(timeLoc), file.TimeBornSrc

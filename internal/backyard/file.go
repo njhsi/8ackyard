@@ -22,14 +22,14 @@ const (
 	TimeBornSrcName TimeBornSrcType = "name"
 )
 
-type FileIndexed struct {
+type File8 struct {
 	Id       uint64 //xxh3 of file content
 	Path     string //full path
 	Size     int64
-	Hostname string    //uname of the machine
-	Mtime    time.Time //mod time
+	Hostname string //uname of the machine
+	Mtime    int64  //mod time: unix timestamp, utc
 
-	TimeBorn    time.Time        //to be save in db as unix seconds
+	TimeBorn    int64            //birth time: unix timestamp, utc
 	TimeBornSrc TimeBornSrcType  //meta, name, auto
 	MIMEType    string           // xxx of xxx/yyy
 	MIMESubtype string           // yyy of xxxy/yyy
@@ -61,7 +61,7 @@ func fileXXH3(fileName string) uint64 {
 	return hash.Sum64()
 }
 
-func NewFileIndex(fileName string) (error, *FileIndexed) {
+func NewFileIndex(fileName string) (error, *File8) {
 	err, mtimeF, sizeF := fileStat(fileName)
 	if err != nil || sizeF == 0 {
 		log.Errorf("NewFileIndex: stat %v err - %v", fileName, err)
@@ -77,12 +77,12 @@ func NewFileIndex(fileName string) (error, *FileIndexed) {
 
 	hostname, err := os.Hostname()
 
-	fi := &FileIndexed{
+	fi := &File8{
 		Path:        fileName,
 		Size:        sizeF,
-		Mtime:       mtimeF,
+		Mtime:       mtimeF.Unix(),
 		Hostname:    hostname,
-		TimeBorn:    birthF,
+		TimeBorn:    birthF.Unix(),
 		TimeBornSrc: birthSrcF,
 	}
 

@@ -27,7 +27,7 @@ type IndexJob struct {
 	FileName string
 	IndexOpt IndexOptions
 	Ind      *Index
-	ChDB     chan *FileIndexed
+	ChDB     chan *File8
 }
 
 func IndexWorker(jobs <-chan IndexJob, et *exiftool.Exiftool) {
@@ -38,7 +38,7 @@ func IndexWorker(jobs <-chan IndexJob, et *exiftool.Exiftool) {
 	}
 }
 
-func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool.Exiftool, chDB chan *FileIndexed) {
+func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool.Exiftool, chDB chan *File8) {
 	//	log.Infof("mainIndex: entering, %v , %v", fileName, exifTool)
 
 	sizeLimit := config.OriginalsLimit()
@@ -102,7 +102,7 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 			takeAt = takeAt.In(timeLoc)
 			log.Infof("mainIndex: exif has no TimeZone, did adjust.  exif.takenat=%v,  duration=%v", exif.TakenAt, tDuration)
 		}
-		fi.TimeBorn, fi.TimeBornSrc = takeAt, TimeBornSrcMeta //TODO: exif.TimeZone
+		fi.TimeBorn, fi.TimeBornSrc = takeAt.Unix(), TimeBornSrcMeta //TODO: exif.TimeZone
 		log.Infof("mainIndex: exif.takenat=%v, fi.timeborn=%v", exif.TakenAt, fi.TimeBorn)
 	}
 
