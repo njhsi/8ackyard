@@ -92,17 +92,13 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		}
 	}
 
-	type FileInDB struct {
-		Size  int64
-		Mtime int64
-		Id    int64
-	}
-	mapFiles := make(map[string]FileInDB)
+	mapFiles := make(map[string]File8)
 	dbtx, err := db.Begin()
 	dbrows, err := dbtx.Query("select path,size,timemodified,id from files;")
 	for dbrows.Next() {
-		fidPath, fid := "", FileInDB{}
-		if err := dbrows.Scan(&fidPath, &fid.Size, &fid.Mtime, &fid.Id); err != nil {
+		fidPath, fid := "", File8{}
+		log.Warnf("index: to Scan...")
+		if err := dbrows.Scan(&fidPath, &fid.Size, &fid.TimeModified, &fid.Id); err != nil {
 			log.Fatalf("dbrows.Scan :%v", err)
 		}
 		mapFiles[fidPath] = fid
@@ -177,8 +173,8 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			if sInsert == nil {
 				sInsert, _ = dbtx.Prepare(sqlInsert)
 			}
-			if _, err := sInsert.Exec(fi.Path, int64(fi.Id), fi.Size, fi.Hostname,
-				fi.Mtime, fi.TimeBorn, fi.TimeBornSrc,
+			if _, err := sInsert.Exec(fi.Path, fi.Id, fi.Size, fi.Hostname,
+				fi.TimeModified, fi.TimeBorn, fi.TimeBornSrc,
 				fi.MIMEType, fi.MIMESubtype, fi.Info); err != nil {
 				log.Warnf("index db: sInsert.Exec err=%v, fi=%v", err, fi)
 			}
@@ -252,7 +248,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 			if fid, ok := mapFiles[fileName]; ok == true {
 				if err, mtime, size := fileStat(fileName); err == nil {
 					mtime_ts := mtime.Unix()
-					if fid.Size == size && fid.Mtime == mtime_ts { //TODO: strict option to check ID
+					if fid.Size == size && fid.TimeModified == mtime_ts { //TODO: strict option to check ID
 						done[fileName] = fs.Processed
 						log.Infof("index: Walk - file=[%v] with id=[%v] was in db, not processing..", fileName, fid.Id)
 					}
@@ -318,7 +314,7 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		}
 
 		jobs2 := make(chan BackupJob)
-		chDb2 := make(chan *FileBacked, 50)
+		chDb2 := make(chan *File8, 50)
 
 		wg.Add(numWorkers)
 		for i := 0; i < numWorkers; i++ {
@@ -356,21 +352,20 @@ func (ind *Index) Start(opt IndexOptions) fs.Done {
 		}()
 
 		//load the backup jobs
-		var q_path string
-		var q_size, q_timemodified, q_timeborn int64
-		var q_hostname, q_timebornsrc, q_mimetype, q_mimesubtype, q_info string
 		sqlQuery := `select path, size, hostname, timemodified, timeborn, timebornsrc, mimetype, mimesubtype, info from files where id=?`
 		for _, id := range ids {
-			var size int64
+			job := BackupJob{Id: id}
+			fid := &File8{
+				Id: id,
+			}
 			rows, _ := dbtx.Query(sqlQuery, id)
 			for rows.Next() {
-				if err := rows.Scan(&q_path, &q_size, &q_hostname, &q_timemodified, &q_timeborn, &q_timebornsrc, &q_mimetype, &q_mimesubtype, &q_info); err == nil {
-					if size != 0 && size != q_size {
-						log.Fatalf("backup: different size with same id %v, %v", id, backupOpt)
-					}
-					log.Infof("backup: Scan %v %v", q_path, id)
+				if err := rows.Scan(&fid.Path, &fid.Size, &fid.Hostname, &fid.TimeModified, &fid.TimeBorn, &fid.TimeBornSrc, &fid.MIMEType, &fid.MIMESubtype, &fid.Info); err == nil {
+					log.Infof("backup: Scan %v %v %v", fid.Path, id, backupOpt)
+
 				}
 			}
+			jobs2 <- job
 
 		}
 		dbtx.Commit()

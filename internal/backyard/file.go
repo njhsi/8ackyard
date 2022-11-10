@@ -23,11 +23,11 @@ const (
 )
 
 type File8 struct {
-	Id       uint64 //xxh3 of file content
-	Path     string //full path
-	Size     int64
-	Hostname string //uname of the machine
-	Mtime    int64  //mod time: unix timestamp, utc
+	Id           int64  //xxh3 of file content
+	Path         string //full path
+	Size         int64
+	Hostname     string //uname of the machine
+	TimeModified int64  //mod time: unix timestamp, utc
 
 	TimeBorn    int64            //birth time: unix timestamp, utc
 	TimeBornSrc TimeBornSrcType  //meta, name, auto
@@ -78,12 +78,12 @@ func NewFileIndex(fileName string) (error, *File8) {
 	hostname, err := os.Hostname()
 
 	fi := &File8{
-		Path:        fileName,
-		Size:        sizeF,
-		Mtime:       mtimeF.Unix(),
-		Hostname:    hostname,
-		TimeBorn:    birthF.Unix(),
-		TimeBornSrc: birthSrcF,
+		Path:         fileName,
+		Size:         sizeF,
+		TimeModified: mtimeF.Unix(),
+		Hostname:     hostname,
+		TimeBorn:     birthF.Unix(),
+		TimeBornSrc:  birthSrcF,
 	}
 
 	file, err := os.Open(fileName)
@@ -120,11 +120,11 @@ func NewFileIndex(fileName string) (error, *File8) {
 	if _, err := io.Copy(hash, file); err != nil {
 		log.Errorf("NewFileIndex: Copy for hash %v err - %v", fileName, err)
 	}
-	fi.Id = hash.Sum64()
+	fi.Id = int64(hash.Sum64())
 
 	return nil, fi
 }
-func Uint64ToString(s uint64) string {
+func Int64ToString(s int64) string {
 	var result []byte
 	result = append(
 		result,
