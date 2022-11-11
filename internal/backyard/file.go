@@ -11,6 +11,7 @@ import (
 
 	"github.com/barasher/go-exiftool"
 	"github.com/h2non/filetype"
+	"github.com/photoprism/photoprism/pkg/fs"
 	"github.com/zeebo/xxh3"
 )
 
@@ -24,17 +25,18 @@ const (
 
 type File8 struct {
 	Id           int64  //xxh3 of file content
-	Name         string //full path for indexed files, basename for backup files
+	Name         string //full path for indexed files, full path for backup files
 	Size         int64
 	Hostname     string //uname of the machine
 	TimeModified int64  //mod time: unix timestamp, utc
 
-	TimeBorn    int64            //birth time: unix timestamp, utc
-	TimeBornSrc TimeBornSrcType  //meta, name, auto
-	MIMEType    string           // xxx of xxx/yyy
-	MIMESubtype string           // yyy of xxxy/yyy
-	Duplica     map[string]int64 //fullpath:modtime
+	TimeBorn    int64           //birth time: unix timestamp, utc
+	TimeBornSrc TimeBornSrcType //meta, name, auto
+	MIMEType    string          // xxx of xxx/yyy
+	MIMESubtype string          // yyy of xxxy/yyy
 	Info        string
+
+	backup_ *File8 //track what's in db
 }
 
 func fileStat(fileName string) (error, time.Time, int64) {
@@ -140,6 +142,18 @@ func Int64ToString(s int64) string {
 
 	return hex.EncodeToString(result)
 
+}
+func CopyWithStat(src, dest string) (err error) {
+	if err := fs.Copy(src, dest); err != nil {
+		return nil
+	}
+	si, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	err = os.Chmod(dest, si.Mode())
+	err = os.Chtimes(dest, si.ModTime(), si.ModTime())
+	return nil
 }
 
 func buildExifJson(fileName string, et *exiftool.Exiftool) ([]byte, error) {

@@ -17,6 +17,7 @@ type IndexOptions struct {
 	Path       string
 	BackupPath string
 	CachePath  string
+	Hostname   string
 	NumWorkers int
 	Rescan     bool
 	Convert    bool
@@ -47,6 +48,9 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 	if err != nil || fi == nil || fi.Size <= 0 || fi.Size > sizeLimit {
 		log.Errorf("mainIndex: NewFileIndex - wrong of file size of %v,  err=%v, fi=%v", fileName, err, fi)
 		return
+	}
+	if len(opt.Hostname) > 0 {
+		fi.Hostname = opt.Hostname
 	}
 
 	exif := &meta.Data{}

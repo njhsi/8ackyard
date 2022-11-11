@@ -1,8 +1,12 @@
 package backyard
 
 import (
+	"os"
+	"path"
 	"path/filepath"
 	"time"
+
+	"github.com/photoprism/photoprism/pkg/fs"
 )
 
 type BackupOptions struct {
@@ -17,24 +21,30 @@ type BackupJob struct {
 	Id        int64
 	BackupOpt BackupOptions
 	Files     []*File8
-	BackFile  *File8
+	BackFile  *File8 //existed in db
 	ChDB      chan *File8
 }
 
 func BackupWorker(jobs <-chan BackupJob) {
 	for job := range jobs {
+		log.Infof("BackupWorker:     got a job[%v %v], %v files. uniq=%v ", job.Files[0].Id, job.Files[0].Name, len(job.Files), len(job.Files) == 1)
+
 		f0 := job.Files[0]
-		log.Infof("BackupWorker:     got a job[%v %v], %v files. uniq=%v ", f0.Id, f0.Name, len(job.Files), len(job.Files) == 1)
+		if job.BackFile != nil {
+			f0 = job.BackFile
+		}
+
 		if f0.MIMEType != "video" && f0.MIMEType != "audio" && f0.MIMEType != "image" {
 			log.Warnf("BackupWorker: ignore this mime[%v]..... %+v", f0.MIMEType, f0)
 			continue
 		}
 
 		fb := *f0 //clone
-		fb.Name = filepath.Base(fb.Name)
+		fb.backup_ = job.BackFile
+		fb_basename := filepath.Base(fb.Name)
 
 		for _, f := range job.Files {
-			f_name := filepath.Base(f.Name)
+			f_basename := filepath.Base(f.Name)
 
 			if f.Size != fb.Size || (f.TimeBornSrc == TimeBornSrcMeta && f.TimeBorn != fb.TimeBorn) {
 				log.Fatalf("BackupWorker: conflicted files(size, or birth) - %+v, size=%v, born=%v", f, fb.Size, fb.TimeBorn)
@@ -42,11 +52,11 @@ func BackupWorker(jobs <-chan BackupJob) {
 			if f.TimeModified < fb.TimeModified {
 				fb.TimeModified = f.TimeModified
 			}
-			if f_name != fb.Name {
-				log.Warnf("BackupWorker: id=%v with another name %v", f.Id, f_name)
+			if f_basename != fb_basename {
+				log.Warnf("BackupWorker: id=%v with another name %v", f.Id, f_basename)
 			}
-			if len(f_name) < len(fb.Name) {
-				fb.Name = f_name //prefer short name
+			if len(f_basename) < len(fb_basename) { //TODO: other names could be symlink to the prefered name in backup folder
+				fb_basename = f_basename //prefer short name
 			}
 			if f.TimeBorn < fb.TimeBorn {
 				fb.TimeBorn = f.TimeBorn
@@ -54,13 +64,55 @@ func BackupWorker(jobs <-chan BackupJob) {
 		}
 		//make the destination to backup
 		birth := time.Unix(fb.TimeBorn, 0).Local()
-		dest := "/" + f0.MIMEType + "/" + birth.Format("2006/01/02") + "/" + fb.Name
-		//update fb
+		dest := job.BackupOpt.BackupPath + "/" + f0.MIMEType + "/" + birth.Format("2006/01/02") + "/" + fb_basename
+		dest = path.Clean(dest)
 
 		//do backup on disk: 1)check if existed on disk
+		path_final := ""                                             // if backup confirmed finished on disk
+		if job.BackFile != nil && fs.FileExists(job.BackFile.Name) { //TODO: hostname check
+			id_fb_ondisk := int64(fileXXH3(job.BackFile.Name))
+			if id_fb_ondisk == job.BackFile.Id {
+				//return after confirm naming
+				path_final = dest
+				if dest != job.BackFile.Name {
+					if err := os.Rename(job.BackFile.Name, dest); err != nil {
+						log.Warnf("BackupWorker: os.Rename failed %v -> %v", job.BackFile.Name, dest)
+						path_final = "" //reset
+					}
+				}
+			} else {
+				log.Fatalf("BackupWorker: rotten bits? fi=%+v with id=%v on drive", job.BackFile, id_fb_ondisk)
+			}
+		}
+		for len(path_final) == 0 && fs.FileExists(dest) {
+			id_f_ondisk := int64(fileXXH3(dest))
+			if fb.Id == id_f_ondisk {
+				path_final = dest
+				log.Infof("BackupWorker: dest=%v existed on disk with same id of fb=%+v", dest, fb)
+				//TODO: confirm stats
+				break
+			} else {
+				log.Warnf("BackupWorker: dest=%v existed on disk with different id[%v], fb=%+v", dest, id_f_ondisk, fb)
+				dest = dest + Int64ToString(fb.Id) + "_XXH3"
+				if len(dest) > 256 {
+					log.Fatalf("BackupWorker: can not choose dest(%v) at all, fb=%+v", dest, fb)
+				}
+			}
+		}
+		if len(path_final) == 0 && len(dest) > 0 {
+			for _, f := range job.Files {
+				if err := CopyWithStat(f.Name, dest); err == nil { //!!TODO: stat
+					path_final = dest
+					break
+				}
+			}
+		}
+
+		//update fb
+		fb.Name = path_final
 
 		job.ChDB <- &fb
 
-		log.Infof("BackupWorker: choose birth=%v dest=%v - fi=%+v", birth, dest, f0)
+		log.Infof("BackupWorker:     choose birth=%v dest=%v \n  fi=%+v", birth, dest, f0)
 	}
 }
