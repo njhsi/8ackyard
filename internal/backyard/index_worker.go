@@ -107,10 +107,10 @@ func mainIndex(fileName string, ind *Index, opt IndexOptions, exifTool *exiftool
 			log.Infof("mainIndex: exif has no TimeZone, did adjust.  exif.takenat=%v,  duration=%v", exif.TakenAt, tDuration)
 		}
 		fi.TimeBorn, fi.TimeBornSrc = takeAt.Unix(), TimeBornSrcMeta //TODO: exif.TimeZone
-		log.Infof("mainIndex: exif.takenat=%v, fi.timeborn=%v", exif.TakenAt, fi.TimeBorn)
 	}
 
 	chDB <- fi
-
-	log.Infof("mainIndex:  DONE(%v) - fi=%+v | exif.takenat=%v,tz=%v, timeoffset=%v | err=%v", fileName, fi, exif.TakenAt, exif.TimeZone, exif.OffsetTimeOriginal, err)
+	log.Infof("mainIndex:  DONE(%v) - fi.timebor=%v|exif(takenat=%v,tz=%v,timeoffset=%v)|fi=%+v,err=%v",
+		fileName, time.Unix(fi.TimeBorn, 0).Local(),
+		exif.TakenAt, exif.TimeZone, exif.OffsetTimeOriginal, fi, err)
 }

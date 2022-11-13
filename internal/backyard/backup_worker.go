@@ -25,9 +25,10 @@ type BackupJob struct {
 	ChDB      chan *File8
 }
 
-func BackupWorker(jobs <-chan BackupJob) {
+func BackupWorker(jobs <-chan *BackupJob) {
 	for job := range jobs {
-		log.Infof("BackupWorker:     got a job[%v %v], %v files. uniq=%v ", job.Files[0].Id, job.Files[0].Name, len(job.Files), len(job.Files) == 1)
+		log.Infof("BackupWorker:     got a job[%v %v, Backfile=%v], %v files. uniq=%v ",
+			job.Files[0].Id, job.Files[0].Name, job.BackFile, len(job.Files), len(job.Files) == 1)
 
 		f0 := job.Files[0]
 		if job.BackFile != nil {
@@ -35,7 +36,9 @@ func BackupWorker(jobs <-chan BackupJob) {
 		}
 
 		if f0.MIMEType != "video" && f0.MIMEType != "audio" && f0.MIMEType != "image" {
+			fb := &File8{Id: f0.Id, Size: 0} //must send back to count on
 			log.Warnf("BackupWorker: ignore this mime[%v]..... %+v", f0.MIMEType, f0)
+			job.ChDB <- fb
 			continue
 		}
 
@@ -73,19 +76,21 @@ func BackupWorker(jobs <-chan BackupJob) {
 			id_fb_ondisk := int64(fileXXH3(job.BackFile.Name))
 			if id_fb_ondisk == job.BackFile.Id {
 				//return after confirm naming
+				log.Infof("BackupWorker: job.BackFile(%v) existed on disk with same id(%v), might do rename to dest=%v ", job.BackFile.Name, id_fb_ondisk, dest)
 				path_final = dest
 				if dest != job.BackFile.Name {
 					if err := os.Rename(job.BackFile.Name, dest); err != nil {
-						log.Warnf("BackupWorker: os.Rename failed %v -> %v", job.BackFile.Name, dest)
+						log.Warnf("BackupWorker: existed on disk with same id, but os.Rename failed %v -> %v", job.BackFile.Name, dest)
 						path_final = "" //reset
 					}
 				}
 			} else {
-				log.Fatalf("BackupWorker: rotten bits? fi=%+v with id=%v on drive", job.BackFile, id_fb_ondisk)
+				log.Warnf("BackupWorker: rotten bits or normal names duplicated... fi=%+v, id_fb_ondisk=%v", job.BackFile, id_fb_ondisk)
 			}
 		}
 		for len(path_final) == 0 && fs.FileExists(dest) {
-			id_f_ondisk := int64(fileXXH3(dest))
+			//id_f_ondisk := fb.Id
+			id_f_ondisk := int64(fileXXH3(dest)) //TODO: stat check to speed up..
 			if fb.Id == id_f_ondisk {
 				path_final = dest
 				log.Infof("BackupWorker: dest=%v existed on disk with same id of fb=%+v", dest, fb)
@@ -93,7 +98,7 @@ func BackupWorker(jobs <-chan BackupJob) {
 				break
 			} else {
 				log.Warnf("BackupWorker: dest=%v existed on disk with different id[%v], fb=%+v", dest, id_f_ondisk, fb)
-				dest = dest + Int64ToString(fb.Id) + "_XXH3"
+				dest = dest + "-" + Int64ToString(fb.Id) + "_XXH3"
 				if len(dest) > 256 {
 					log.Fatalf("BackupWorker: can not choose dest(%v) at all, fb=%+v", dest, fb)
 				}
@@ -101,9 +106,15 @@ func BackupWorker(jobs <-chan BackupJob) {
 		}
 		if len(path_final) == 0 && len(dest) > 0 {
 			for _, f := range job.Files {
-				if err := CopyWithStat(f.Name, dest); err == nil { //!!TODO: stat
-					path_final = dest
-					break
+				if err, mtime, size := fileStat(f.Name); err == nil &&
+					size == f.Size && mtime.Unix() == f.TimeModified {
+					log.Infof("BackupWorker: going to do copy on disk %v->%v, id=%v ", f.Name, dest, f.Id)
+					if err := CopyWithStat(f.Name, dest); err == nil { //!!TODO: stat
+						path_final = dest
+						break
+					} else {
+						log.Warnf("BackupWorker: failed to do copy on disk %v->%v, id=%v . err=%v ", f.Name, dest, f.Id, err)
+					}
 				}
 			}
 		}
