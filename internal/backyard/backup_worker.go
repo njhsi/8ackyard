@@ -4,6 +4,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/photoprism/photoprism/pkg/fs"
@@ -17,12 +18,18 @@ type BackupOptions struct {
 	Rescan        bool
 }
 
+type BackupFsMutex struct {
+	files map[string]*sync.RWMutex
+	mutex sync.RWMutex
+}
+
 type BackupJob struct {
 	Id        int64
 	BackupOpt BackupOptions
 	Files     []*File8
 	BackFile  *File8 //existed in db
 	ChDB      chan *File8
+	Bfm       *BackupFsMutex
 }
 
 func BackupWorker(jobs <-chan *BackupJob) {
@@ -71,12 +78,15 @@ func BackupWorker(jobs <-chan *BackupJob) {
 		dest = path.Clean(dest)
 
 		//do backup on disk: 1)check if existed on disk
-		path_final := ""                                             // if backup confirmed finished on disk
+		path_final := "" // if backup confirmed finished on disk
+
 		if job.BackFile != nil && fs.FileExists(job.BackFile.Name) { //TODO: hostname check
+			job.Bfm.Lock(job.BackFile.Name)
 			id_fb_ondisk := int64(fileXXH3(job.BackFile.Name))
 			if id_fb_ondisk == job.BackFile.Id {
 				//return after confirm naming
-				log.Infof("BackupWorker: job.BackFile(%v) existed on disk with same id(%v), might do rename to dest=%v ", job.BackFile.Name, id_fb_ondisk, dest)
+				log.Infof("BackupWorker: job.BackFile(%v) existed on disk with same id(%v), do rename/%v to dest=%v ",
+					job.BackFile.Name, id_fb_ondisk, dest != job.BackFile.Name, dest)
 				path_final = dest
 				if dest != job.BackFile.Name {
 					if err := os.Rename(job.BackFile.Name, dest); err != nil {
@@ -87,15 +97,18 @@ func BackupWorker(jobs <-chan *BackupJob) {
 			} else {
 				log.Warnf("BackupWorker: rotten bits or normal names duplicated... fi=%+v, id_fb_ondisk=%v", job.BackFile, id_fb_ondisk)
 			}
+			job.Bfm.UnLock(job.BackFile.Name)
 		}
+
 		for len(path_final) == 0 && fs.FileExists(dest) {
-			//id_f_ondisk := fb.Id
+			job.Bfm.Lock(dest)
 			id_f_ondisk := int64(fileXXH3(dest)) //TODO: stat check to speed up..
+			job.Bfm.UnLock(dest)
+
 			if fb.Id == id_f_ondisk {
 				path_final = dest
 				log.Infof("BackupWorker: dest=%v existed on disk with same id of fb=%+v", dest, fb)
 				//TODO: confirm stats
-				break
 			} else {
 				log.Warnf("BackupWorker: dest=%v existed on disk with different id[%v], fb=%+v", dest, id_f_ondisk, fb)
 				dest = dest + "-" + Int64ToString(fb.Id) + "_XXH3"
@@ -109,12 +122,19 @@ func BackupWorker(jobs <-chan *BackupJob) {
 				if err, mtime, size := fileStat(f.Name); err == nil &&
 					size == f.Size && mtime.Unix() == f.TimeModified {
 					log.Infof("BackupWorker: going to do copy on disk %v->%v, id=%v ", f.Name, dest, f.Id)
-					if err := CopyWithStat(f.Name, dest); err == nil { //!!TODO: stat
+					dest_tmp := dest + "-" + Int64ToString(f.Id) + ".tmp"
+					job.Bfm.Lock(dest_tmp)
+					err := CopyWithStat(f.Name, dest_tmp) //!!TODO: stat
+					if err == nil && f.Id == int64(fileXXH3(dest_tmp)) {
+						job.Bfm.Lock(dest)
+						os.Rename(dest_tmp, dest)
+						job.Bfm.UnLock(dest)
 						path_final = dest
 						break
 					} else {
-						log.Warnf("BackupWorker: failed to do copy on disk %v->%v, id=%v . err=%v ", f.Name, dest, f.Id, err)
+						log.Warnf("BackupWorker: failed to copy on disk or not identically copied. %v(%v)->%v, err=%v ", f.Name, f.Id, dest_tmp, err)
 					}
+					job.Bfm.UnLock(dest_tmp)
 				}
 			}
 		}
@@ -125,5 +145,29 @@ func BackupWorker(jobs <-chan *BackupJob) {
 		job.ChDB <- &fb
 
 		log.Infof("BackupWorker:     choose birth=%v dest=%v \n  fi=%+v", birth, dest, f0)
+	}
+}
+
+func NewBackupFsMutex() *BackupFsMutex {
+	bfm := &BackupFsMutex{}
+	bfm.files = make(map[string]*sync.RWMutex)
+	return bfm
+}
+
+func (l *BackupFsMutex) Lock(fileName string) {
+	l.mutex.Lock()
+	if _, ok := l.files[fileName]; ok == false {
+		l.files[fileName] = &sync.RWMutex{}
+	}
+	l.mutex.Unlock()
+
+	l.files[fileName].Lock()
+}
+func (l *BackupFsMutex) UnLock(fileName string) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	if m, ok := l.files[fileName]; ok == true {
+		m.Unlock()
 	}
 }

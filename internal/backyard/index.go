@@ -354,6 +354,7 @@ func backup_start(opt IndexOptions, db *sql.DB) {
 
 	var bcount, jcount int
 	var job *BackupJob
+	bfm := NewBackupFsMutex()
 	for bcount < len(ids) {
 		if dbtx == nil {
 			dbtx, _ = db.Begin()
@@ -365,6 +366,7 @@ func backup_start(opt IndexOptions, db *sql.DB) {
 				Id:        id,
 				BackupOpt: backupOpt,
 				ChDB:      chDb,
+				Bfm:       bfm,
 			}
 			rows, _ := dbtx.Query(sqlQueryFiles, id, opt.Hostname)
 			for rows.Next() {
